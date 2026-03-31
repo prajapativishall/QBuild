@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: qbuild-ingress
+spec:
+  rules:
+  - host: qbuild.local
+    http:
+      paths:
+      
+      # Frontend
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: qbuild-homepage-service
+            port:
+              number: 80
+
+      # API Gateway
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: qbuild-gateway-service
+            port:
+              number: 3000

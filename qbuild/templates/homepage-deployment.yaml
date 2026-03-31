@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qbuild-homepage
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: qbuild-homepage
+  template:
+    metadata:
+      labels:
+        app: qbuild-homepage
+    spec:
+      containers:
+      - name: homepage
+        image: {{ .Values.image.homepage }}
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 80

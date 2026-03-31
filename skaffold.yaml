@@ -1,0 +1,17 @@
+apiVersion: skaffold/v4beta13
+kibuild:
+  artifacts:
+    - image: qbuild-auth
+      context: services/auth-service
+      docker:
+        dockerfile: Dockerfile
+
+    - image: qbuild-gateway
+      context: gateway/api-gateway
+      docker:
+        dockerfile: Dockerfile
+
+    - image: qbuild-homepage
+      context: frontend/homepage
+      docker:
+        dockerfile: Dockerfile
