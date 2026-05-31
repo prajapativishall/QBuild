@@ -1,0 +1,310 @@
+/* Professional Dashboard Styles */
+
+.dashboard-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-8);
+  animation: slideUp 0.6s ease-out;
+}
+
+.dashboard-title-section {
+  flex: 1;
+}
+
+.dashboard-title {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--secondary-900);
+  margin-bottom: var(--spacing-2);
+  letter-spacing: -0.02em;
+}
+
+.dashboard-subtitle {
+  font-size: var(--font-size-base);
+  color: var(--secondary-600);
+  font-weight: var(--font-weight-normal);
+}
+
+.dashboard-actions {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+/* Total Projects Section */
+.dashboard-total-projects {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--spacing-6);
+  margin-bottom: var(--spacing-8);
+  animation: slideUp 0.6s ease-out;
+}
+
+.total-projects-card {
+  background: white;
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-6);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--secondary-200);
+  min-width: 200px;
+  position: relative;
+  overflow: hidden;
+  transition: all var(--transition-normal);
+}
+
+.total-projects-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-primary);
+}
+
+.total-projects-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 10px -4px rgba(0, 0, 0, 0.05);
+  border-color: var(--secondary-300);
+}
+
+.total-projects-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-4);
+}
+
+.total-projects-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--secondary-600);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.total-projects-value {
+  font-size: var(--font-size-4xl);
+  font-weight: 700;
+  color: var(--secondary-900);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+/* Search and Filter */
+.dashboard-search-filter {
+  display: flex;
+  gap: var(--spacing-4);
+  align-items: center;
+}
+
+.search-input {
+  flex: 1;
+  padding: var(--spacing-3) var(--spacing-4);
+  border: 1px solid var(--secondary-200);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  background: white;
+  transition: all var(--transition-normal);
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.search-input:hover {
+  border-color: var(--secondary-300);
+}
+
+.project-select {
+  min-width: 250px;
+  padding: var(--spacing-3) var(--spacing-4);
+  border: 1px solid var(--secondary-200);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  background: white;
+  transition: all var(--transition-normal);
+}
+
+.project-select:hover {
+  border-color: var(--secondary-300);
+}
+
+.project-select:focus {
+  outline: none;
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+/* Spider Charts Section */
+.dashboard-spider-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+  gap: var(--spacing-6);
+  animation: slideUp 0.8s ease-out;
+}
+
+.spider-chart-card {
+  background: white;
+  border-radius: var(--radius-xl);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--secondary-200);
+  overflow: hidden;
+  transition: all var(--transition-normal);
+}
+
+.spider-chart-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 10px -4px rgba(0, 0, 0, 0.05);
+  border-color: var(--secondary-300);
+}
+
+.card-header-dashboard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-6);
+  border-bottom: 1px solid var(--secondary-200);
+  background: linear-gradient(135deg, var(--secondary-50) 0%, white 100%);
+}
+
+.card-title-dashboard {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--secondary-900);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.card-content-dashboard {
+  padding: var(--spacing-6);
+}
+
+.chart-loading,
+.chart-empty {
+  text-align: center;
+  padding: var(--spacing-12);
+  color: var(--secondary-500);
+  font-size: var(--font-size-sm);
+}
+
+.domain-back-button {
+  margin-bottom: var(--spacing-4);
+}
+
+/* Button Styles */
+.btn {
+  padding: var(--spacing-3) var(--spacing-6);
+  border: none;
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary {
+  background: #dc2626;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #b91c1c;
+}
+
+.btn-secondary {
+  background: #dc2626;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #b91c1c;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    gap: var(--spacing-4);
+  }
+
+  .dashboard-title {
+    font-size: var(--font-size-2xl);
+  }
+
+  .dashboard-total-projects {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-search-filter {
+    flex-direction: column;
+  }
+
+  .project-select {
+    min-width: 100%;
+  }
+
+  .dashboard-spider-charts {
+    grid-template-columns: 1fr;
+  }
+
+  .total-projects-card {
+    min-width: auto;
+  }
+
+  .total-projects-value {
+    font-size: var(--font-size-3xl);
+  }
+
+}
+
+/* Loading States */
+.dashboard-loading {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.total-projects-card.loading,
+.spider-chart-card.loading {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Animations */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Smooth transitions */
+.total-projects-card,
+.spider-chart-card,
+.search-input,
+.project-select {
+  transition: all var(--transition-normal);
+}
+
+
