@@ -148,8 +148,11 @@ export const projectApi = {
     return apiCall(`/projects/${projectId}/phases/${phaseNumber}/configuration`);
   },
 
-  getDomainSpiderChart: async (projectId, domainId) => {
-    return apiCall(`/projects/${projectId}/domains/${domainId}/spider-chart`);
+  getDomainSpiderChart: async (projectId, domainId, phase = null) => {
+    const url = phase
+      ? `/projects/${projectId}/domains/${domainId}/spider-chart?phase=${phase}`
+      : `/projects/${projectId}/domains/${domainId}/spider-chart`;
+    return apiCall(url);
   },
 };
 

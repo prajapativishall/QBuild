@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { domainApi, subDomainApi } from '../services/api';
 import '../styles/Domains.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 const Domains = () => {
+  const { isManager } = useAuth();
   const [domains, setDomains] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -245,11 +247,13 @@ const Domains = () => {
           <h1 className="stages-title">Domains</h1>
           <p className="stages-subtitle">Define domains and link available sub-domains</p>
         </div>
-        <div className="stages-actions">
-          <button className="btn btn-primary" onClick={handleCreate}>
-            + New Domain
-          </button>
-        </div>
+        {!isManager && (
+          <div className="stages-actions">
+            <button className="btn btn-primary" onClick={handleCreate}>
+              + New Domain
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="stages-search">
@@ -270,9 +274,11 @@ const Domains = () => {
           <p className="stages-empty-description">
             Create a domain and link sub-domains to start building your checklist structure.
           </p>
-          <button className="stages-empty-action" onClick={handleCreate}>
-            + Create Domain
-          </button>
+          {!isManager && (
+            <button className="stages-empty-action" onClick={handleCreate}>
+              + Create Domain
+            </button>
+          )}
         </div>
       ) : (
         <div className="stages-list">
@@ -298,12 +304,17 @@ const Domains = () => {
                     </span>
                   </td>
                   <td className="table-actions">
-                    <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(domain)}>
-                      Edit
-                    </button>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(domain.id)}>
-                      Delete
-                    </button>
+                    {!isManager && (
+                      <>
+                        <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(domain)}>
+                          Edit
+                        </button>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(domain.id)}>
+                          Delete
+                        </button>
+                      </>
+                    )}
+                    {isManager && <span style={{ color: '#6b7280', fontSize: '13px' }}>Read-only</span>}
                   </td>
                 </tr>
               ))}

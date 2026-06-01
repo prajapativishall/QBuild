@@ -1,6 +1,6 @@
-# qrating_mobile_fixed
+# QBuild Mobile
 
-A new Flutter project.
+QBuild Mobile App for Construction Inspection
 
 ## Getting Started
 

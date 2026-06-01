@@ -22,11 +22,11 @@ void main() async {
   // Initialize shared preferences
   await SharedPreferences.getInstance();
   
-  runApp(const QRatingApp());
+  runApp(const QBuildApp());
 }
 
-class QRatingApp extends StatelessWidget {
-  const QRatingApp({super.key});
+class QBuildApp extends StatelessWidget {
+  const QBuildApp({super.key});
 
   @override
   Widget build(BuildContext context) {

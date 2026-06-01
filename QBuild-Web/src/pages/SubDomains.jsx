@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { subDomainApi, queryApi } from '../services/api';
 import '../styles/SubDomains.css';
 
 const SubDomains = () => {
+  const { isManager } = useAuth();
   const [subDomains, setSubDomains] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -292,11 +294,13 @@ const SubDomains = () => {
           <h1 className="sections-title">Sub-Domains Management</h1>
           <p className="sections-subtitle">Manage inspection sub-domains and their queries</p>
         </div>
-        <div className="sections-actions">
-          <button className="btn btn-primary" onClick={handleCreate}>
-            + New Sub-Domain
-          </button>
-        </div>
+        {!isManager && (
+          <div className="sections-actions">
+            <button className="btn btn-primary" onClick={handleCreate}>
+              + New Sub-Domain
+            </button>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -331,7 +335,7 @@ const SubDomains = () => {
               ? 'Try a different search term.' 
               : 'Create your first sub-domain and start adding queries.'}
           </p>
-          {subDomains.length === 0 && (
+          {subDomains.length === 0 && !isManager && (
             <button className="sections-empty-action" onClick={handleCreate} disabled={loading}>
               + Create Sub-Domain
             </button>
@@ -361,12 +365,17 @@ const SubDomains = () => {
                     </span>
                   </td>
                   <td className="table-actions">
-                    <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(subDomain)}>
-                      Edit
-                    </button>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(subDomain.id)}>
-                      Delete
-                    </button>
+                    {!isManager && (
+                      <>
+                        <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(subDomain)}>
+                          Edit
+                        </button>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(subDomain.id)}>
+                          Delete
+                        </button>
+                      </>
+                    )}
+                    {isManager && <span style={{ color: '#6b7280', fontSize: '13px' }}>Read-only</span>}
                   </td>
                 </tr>
               ))}

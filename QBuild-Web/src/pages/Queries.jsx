@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { queryApi } from '../services/api';
 import '../styles/Queries.css';
 
 const Queries = () => {
+  const { isManager } = useAuth();
   const [queries, setQueries] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -101,9 +103,11 @@ const Queries = () => {
       <div className="queries-header">
         <h1 className="queries-title">Queries Management</h1>
         <p className="queries-subtitle">Manage all inspection queries independently</p>
-        <button className="btn btn-primary" onClick={handleCreate}>
-          + New Query
-        </button>
+        {!isManager && (
+          <button className="btn btn-primary" onClick={handleCreate}>
+            + New Query
+          </button>
+        )}
       </div>
 
       <div className="queries-search">
@@ -174,18 +178,24 @@ const Queries = () => {
                   <tr key={query.id}>
                     <td>{query.text}</td>
                     <td>
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        onClick={() => handleEdit(query)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="btn btn-sm btn-danger"
-                        onClick={() => handleDelete(query.id)}
-                      >
-                        Delete
-                      </button>
+                      {!isManager ? (
+                        <>
+                          <button
+                            className="btn btn-sm btn-secondary"
+                            onClick={() => handleEdit(query)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="btn btn-sm btn-danger"
+                            onClick={() => handleDelete(query.id)}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      ) : (
+                        <span style={{ color: '#6b7280', fontSize: '13px' }}>Read-only</span>
+                      )}
                     </td>
                   </tr>
                 ))}

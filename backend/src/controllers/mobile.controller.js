@@ -599,6 +599,17 @@ const getProjectHierarchy = async (req, res, next) => {
   }
 };
 
+/**
+ * Helper: get the phase number for an inspection
+ */
+async function getInspectionPhase(inspectionId) {
+  const rows = await db.execute(
+    'SELECT phase FROM inspections WHERE id = ?',
+    [inspectionId]
+  );
+  return rows.length > 0 ? rows[0].phase : null;
+}
+
 // Submit response for a query
 const submitQueryResponse = async (req, res, next) => {
   try {
@@ -621,6 +632,9 @@ const submitQueryResponse = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Inspection not found or access denied' });
     }
 
+    // Get the inspection phase to store with the response
+    const inspectionPhase = await getInspectionPhase(inspectionId);
+
     const existingResponse = await db.execute(
       `SELECT id FROM responses WHERE inspection_id = ? AND sub_domain_id = ? AND query_id = ? AND domain_id = ?`,
       [inspectionId, subDomainId, queryId, domainId || null]
@@ -630,22 +644,22 @@ const submitQueryResponse = async (req, res, next) => {
     if (existingResponse.length > 0) {
       await db.execute(
         `UPDATE responses 
-         SET response = ?, nc_type = ?, inspector_comment = ?, additional_remarks = ?, photos = ?, updated_at = NOW()
+         SET response = ?, nc_type = ?, inspector_comment = ?, additional_remarks = ?, photos = ?, phase = ?, updated_at = NOW()
          WHERE inspection_id = ? AND sub_domain_id = ? AND query_id = ? AND domain_id = ?`,
         [response, nc_type || null, inspector_comment || comments || null, additional_remarks || null, 
-         photos ? JSON.stringify(photos) : null, 
+         photos ? JSON.stringify(photos) : null, inspectionPhase,
          inspectionId, subDomainId, queryId, domainId || null]
       );
       result = { action: 'updated' };
     } else {
       const insertResult = await db.execute(
         `INSERT INTO responses 
-         (inspection_id, sub_domain_id, query_id, response, nc_type, inspector_comment, additional_remarks, photos, domain_id, submitted_by, submitted_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+         (inspection_id, sub_domain_id, query_id, response, nc_type, inspector_comment, additional_remarks, photos, domain_id, phase, submitted_by, submitted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
         [inspectionId, subDomainId, queryId, response, nc_type || null, inspector_comment || comments || null, 
          additional_remarks || null, 
          photos ? JSON.stringify(photos) : null, 
-         domainId || null, userId]
+         domainId || null, inspectionPhase, userId]
       );
       result = { action: 'created', responseId: insertResult.insertId };
     }
@@ -677,6 +691,9 @@ const submitSubDomain = async (req, res, next) => {
     if (accessCheck.length === 0) {
       return res.status(404).json({ success: false, message: 'Inspection not found or access denied' });
     }
+
+    // Get the inspection phase to store with the response
+    const inspectionPhase = await getInspectionPhase(inspectionId);
 
     // Check if completion record already exists
     const existingCompletion = await db.execute(
@@ -736,14 +753,15 @@ const submitSubDomain = async (req, res, next) => {
       
       await db.execute(
         `INSERT INTO responses 
-         (inspection_id, sub_domain_id, query_id, response, nc_type, inspector_comment, additional_remarks, photos, domain_id, submitted_by, submitted_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+         (inspection_id, sub_domain_id, query_id, response, nc_type, inspector_comment, additional_remarks, photos, domain_id, phase, submitted_by, submitted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
          ON DUPLICATE KEY UPDATE
            response = VALUES(response),
            nc_type = VALUES(nc_type),
            inspector_comment = VALUES(inspector_comment),
            additional_remarks = VALUES(additional_remarks),
            ${updatePhotosClause}
+           phase = VALUES(phase),
            rejection_notes = NULL,
            rejected_at = NULL,
            rejected_by = NULL`,
@@ -751,7 +769,7 @@ const submitSubDomain = async (req, res, next) => {
          isYesResponse ? null : (inspector_comment || null), 
          isYesResponse ? null : (additional_remarks || null), 
          photosJson, 
-         domainId || null, userId]
+         domainId || null, inspectionPhase, userId]
       );
 
       const queryType = await db.execute(
@@ -762,7 +780,7 @@ const submitSubDomain = async (req, res, next) => {
       if (queryType.length > 0 && queryType[0].query_type === 'primary') {
         const normalizedResponse = String(responseValue).toUpperCase();
         if (['NO', 'N/A'].includes(normalizedResponse)) {
-          await autoSubmitSecondaryResponsesNA(inspectionId, subDomainId, domainId, queryId, userId);
+          await autoSubmitSecondaryResponsesNA(inspectionId, subDomainId, domainId, queryId, userId, inspectionPhase);
         }
       }
     }
@@ -792,7 +810,7 @@ const submitSubDomain = async (req, res, next) => {
   }
 };
 
-const autoSubmitSecondaryResponsesNA = async (inspectionId, subDomainId, domainId, questionId, userId) => {
+const autoSubmitSecondaryResponsesNA = async (inspectionId, subDomainId, domainId, questionId, userId, inspectionPhase) => {
   const parentMapping = await db.execute(
     `SELECT id FROM sub_domain_queries WHERE sub_domain_id = ? AND query_id = ?`,
     [subDomainId, questionId]
@@ -833,19 +851,20 @@ const autoSubmitSecondaryResponsesNA = async (inspectionId, subDomainId, domainI
              additional_remarks = NULL,
              photos = NULL,
              editable_by_inspector = 0,
+             phase = ?,
              rejection_notes = NULL,
              rejected_at = NULL,
              rejected_by = NULL,
              updated_at = NOW()
          WHERE id = ?`,
-        [existingSecondary[0].id]
+        [inspectionPhase, existingSecondary[0].id]
       );
     } else {
       await db.execute(
         `INSERT INTO responses
-         (inspection_id, sub_domain_id, query_id, response, nc_type, inspector_comment, additional_remarks, photos, domain_id, editable_by_inspector, submitted_by, submitted_at)
-         VALUES (?, ?, ?, 'N/A', NULL, NULL, NULL, NULL, ?, 0, ?, NOW())`,
-        [inspectionId, subDomainId, secondary.query_id, domainId || null, userId]
+         (inspection_id, sub_domain_id, query_id, response, nc_type, inspector_comment, additional_remarks, photos, domain_id, phase, editable_by_inspector, submitted_by, submitted_at)
+         VALUES (?, ?, ?, 'N/A', NULL, NULL, NULL, NULL, ?, ?, 0, ?, NOW())`,
+        [inspectionId, subDomainId, secondary.query_id, domainId || null, inspectionPhase, userId]
       );
     }
   }
@@ -1094,6 +1113,9 @@ const uploadInspectionPhoto = async (req, res, next) => {
 
     const relativePath = `/uploads/projects/${projectId}/inspections/${inspectionId}/queries/${query_id}/${filename}`;
 
+    // Get the inspection phase to store with the response
+    const inspectionPhase = await getInspectionPhase(inspectionId);
+
     const currentPhotos = await db.executeOne(
       `SELECT photos FROM responses 
        WHERE inspection_id = ? AND query_id = ? AND sub_domain_id = ? AND domain_id = ?`,
@@ -1114,9 +1136,9 @@ const uploadInspectionPhoto = async (req, res, next) => {
     
     await db.execute(
       `UPDATE responses 
-       SET photos = ?
+       SET photos = ?, phase = ?
        WHERE inspection_id = ? AND query_id = ? AND sub_domain_id = ? AND domain_id = ?`,
-      [JSON.stringify(existingPhotos), inspectionId, query_id, req.body.sub_domain_id, domain_id]
+      [JSON.stringify(existingPhotos), inspectionPhase, inspectionId, query_id, req.body.sub_domain_id, domain_id]
     );
 
     res.status(200).json({

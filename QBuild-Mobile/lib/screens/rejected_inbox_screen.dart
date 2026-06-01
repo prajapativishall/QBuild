@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:qrating_mobile/services/api_service.dart';
+import 'package:qbuild_mobile/services/api_service.dart';
 
 class RejectedInboxScreen extends StatefulWidget {
   const RejectedInboxScreen({super.key});
