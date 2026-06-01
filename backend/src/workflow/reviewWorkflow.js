@@ -94,46 +94,16 @@ const reviewWorkflow = {
     logger.info("Workflow: Approving inspection", { inspectionId, userId, notes, role });
 
     await db.transaction(async (connection) => {
-      // Capture current state before workflow changes
-      const previousState = await reviewWorkflow.captureInspectionState(inspectionId, connection);
-      
-      // Ensure previousState.inspection fields are safe
-      const inspectionProjectId = previousState?.inspection?.project_id || null;
-      const inspectionPhase = previousState?.inspection?.phase || null;
-
-      // Build safe approval history data (avoid undefined values in JSON)
-      // Include the full previous state for historical snapshot viewing
-      const approvalHistoryData = {
-        action: "approve",
-        actor_role: role,
-        action_type: 'approved',
-        scope_type: 'inspection',
-        version: previousState.version,
-        timestamp: new Date().toISOString(),
-        notes: notes,
-        previousState: previousState
-      };
-
-      // Store approval history using new normalized columns
-      const safeHistoryJson = JSON.stringify(approvalHistoryData);
-
-      await connection.execute(
-        `INSERT INTO inspection_rejection_history 
-         (inspection_id, actor_role, action_type, scope_type, rejected_by, rejection_reason, rejection_notes, rejection_date, responses)
-         VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
-        [
-          inspectionId,
-          role,                              // actor_role: 'reviewer' or 'manager'
-          'approved',                        // action_type: 'approved'
-          'inspection',                      // scope_type: 'inspection'
-          userId,
-          `Inspection approved by ${role}`,
-          notes,
-          safeHistoryJson
-        ]
+      // Get project/phase info for phase status update
+      const inspectionResult = await connection.execute(
+        `SELECT project_id, phase FROM inspections WHERE id = ?`,
+        [inspectionId]
       );
+      
+      const inspectionProjectId = inspectionResult[0]?.project_id || null;
+      const inspectionPhase = inspectionResult[0]?.phase || null;
 
-      // Now make the workflow changes
+      // Now make the workflow changes (no history record for approvals)
       if (role === 'manager') {
         // Manager approval flow: update manager_approval_status
         await connection.execute(

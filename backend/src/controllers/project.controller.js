@@ -1,4 +1,5 @@
 const projectService = require('../services/project.service');
+const scoringService = require('../services/scoring.service');
 const logger = require('../utils/logger');
 const db = require('../config/db');
 
@@ -151,13 +152,13 @@ class ProjectController {
     }
   }
 
-  // Get spider chart data for a project
+  // Get spider chart data for a project (only after manager approval)
   async getProjectSpiderChart(req, res) {
     try {
       const { projectId } = req.params;
       const { phase } = req.query;
 
-      // Determine the target phase number for this spider chart. Use selected phase if provided, otherwise use the project's current phase.
+      // Determine the target phase number
       let targetPhaseNumber = phase;
       if (!targetPhaseNumber) {
         const currentPhaseRows = await db.execute(
@@ -170,7 +171,6 @@ class ProjectController {
       }
 
       if (!targetPhaseNumber) {
-        // If no current phase is set, try to get the latest phase by phase_number
         const latestPhase = await db.execute(
           `SELECT phase_number FROM phases WHERE project_id = ? ORDER BY phase_number DESC LIMIT 1`,
           [projectId]
@@ -182,60 +182,49 @@ class ProjectController {
         }
       }
 
-      const query = `
-        SELECT
-          d.id as domain_id,
-          d.domain_name,
-          COUNT(DISTINCT CONCAT(pdsd.domain_id, '-', pdsd.sub_domain_id)) as total_subdomains,
-          COUNT(DISTINCT CASE WHEN cr.id IS NOT NULL THEN CONCAT(pdsd.domain_id, '-', pdsd.sub_domain_id) END) as completed_subdomains,
-          COUNT(DISTINCT CASE WHEN UPPER(cr.response) = 'YES' THEN cr.id END) as yes_count,
-          COUNT(DISTINCT CASE WHEN UPPER(cr.response) = 'NO' THEN cr.id END) as no_count,
-          COUNT(DISTINCT CASE WHEN UPPER(cr.response) = 'NA' THEN cr.id END) as na_count
-        FROM phase_domains pd
-        INNER JOIN domains d ON pd.domain_id = d.id
-        INNER JOIN phase_domain_sub_domains pdsd ON pd.project_id = pdsd.project_id
-          AND pd.phase_number = pdsd.phase_number
-          AND pdsd.domain_id = pd.domain_id
-        LEFT JOIN responses cr ON pdsd.sub_domain_id = cr.sub_domain_id
-          AND pdsd.domain_id = cr.domain_id
-        LEFT JOIN inspections i ON cr.inspection_id = i.id
-          AND i.project_id = pd.project_id
-          AND i.phase = pd.phase_number
-          AND i.manager_approval_status = 'approved'
-        WHERE pd.project_id = ?
-          AND pd.phase_number = ?
-        GROUP BY d.id, d.domain_name
-        ORDER BY d.domain_name
-      `;
+      // Find the manager-approved inspection for this project phase
+      const approvedInspections = await db.execute(
+        `SELECT id FROM inspections 
+         WHERE project_id = ? AND phase = ? AND manager_approval_status = 'approved'
+         LIMIT 1`,
+        [projectId, targetPhaseNumber]
+      );
 
-      const domainScores = await db.execute(query, [projectId, targetPhaseNumber]);
+      if (approvedInspections.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'No manager-approved inspection found for this phase. Spider chart is only available after manager approval.'
+        });
+      }
 
-      const spiderData = domainScores.map(d => {
-        const totalApplicable = d.yes_count + d.no_count; // Exclude N/A
-        const rating = totalApplicable > 0 ? (d.yes_count / totalApplicable) * 10 : 0;
-        
-        return {
-          domain_id: d.domain_id,
-          domain: d.domain_name,
-          score: Math.round(rating * 10) / 10, // Rating out of 10 with 1 decimal
-          completion: d.total_subdomains > 0 ? Math.round((d.completed_subdomains / d.total_subdomains) * 100) : 0,
-          totalQueries: d.yes_count + d.no_count + d.na_count,
-          applicableQueries: totalApplicable,
-          yesCount: d.yes_count,
-          noCount: d.no_count,
-          naCount: d.na_count
-        };
-      });
+      const inspectionId = approvedInspections[0].id;
 
-      // Calculate overall project rating (average of all domain scores)
-      const overallRating = spiderData.length > 0
-        ? Math.round((spiderData.reduce((sum, d) => sum + d.score, 0) / spiderData.length) * 10) / 10
-        : 0;
+      // Use scoring service to get properly calculated scores with weightages
+      const scoringResult = await scoringService.calculateInspectionScore(inspectionId);
+
+      // Format response with domain scores including weightage
+      const spiderData = (scoringResult.domains || []).map(d => ({
+        domain_id: d.domainId,
+        domain: d.domainName,
+        score: Math.round(d.score / 10 * 10) / 10, // Convert percentage (0-100) to out-of-10 scale
+        weightage: d.weightage,
+        subDomains: (d.subDomains || []).map(sd => ({
+          subDomainId: sd.subDomainId,
+          subDomainName: sd.subDomainName,
+          score: Math.round(sd.score / 10 * 10) / 10,
+          weightage: sd.weightage,
+          earnedMarks: sd.earnedMarks,
+          maxMarks: sd.maxMarks
+        }))
+      }));
+
+      const overallRating = scoringResult.inspectionScore;
 
       res.json({
         success: true,
         data: spiderData,
-        overallRating
+        overallRating: Math.round(overallRating * 10) / 10,
+        grade: scoringResult.grade
       });
     } catch (error) {
       logger.error('Error in getProjectSpiderChart:', error);
@@ -253,68 +242,74 @@ class ProjectController {
       const { projectId, domainId } = req.params;
       const { phase } = req.query;
 
-      // Get sub-domain scores for the domain
-      // Rating calculation: (Yes responses / (Yes + No responses)) * 10
-      // N/A responses are excluded from the calculation
-      let query = `
-        SELECT
-          sd.id as sub_domain_id,
-          sd.sub_domain_name,
-          COUNT(DISTINCT q.id) as total_queries,
-          COUNT(DISTINCT CASE WHEN cr.id IS NOT NULL THEN q.id END) as completed_queries,
-          COUNT(DISTINCT CASE WHEN UPPER(cr.response) = 'YES' THEN cr.id END) as yes_count,
-          COUNT(DISTINCT CASE WHEN UPPER(cr.response) = 'NO' THEN cr.id END) as no_count,
-          COUNT(DISTINCT CASE WHEN UPPER(cr.response) = 'NA' THEN cr.id END) as na_count
-        FROM domain_sub_domains dsd
-        INNER JOIN sub_domains sd ON dsd.sub_domain_id = sd.id
-        INNER JOIN sub_domain_queries sdq ON sd.id = sdq.sub_domain_id
-        INNER JOIN queries q ON sdq.query_id = q.id
-        LEFT JOIN responses cr ON q.id = cr.query_id AND cr.sub_domain_id = sd.id AND cr.domain_id = ?
-        LEFT JOIN inspections i ON cr.inspection_id = i.id AND i.project_id = ?
-          AND i.manager_approval_status = 'approved'
-        WHERE dsd.domain_id = ?
-      `;
-
-      const params = [domainId, projectId, domainId];
-
-      // Add phase filter if provided
-      if (phase) {
-        query += ` AND (i.phase = ? OR i.phase IS NULL)`;
-        params.push(phase);
+      // Determine the target phase number
+      let targetPhaseNumber = phase;
+      if (!targetPhaseNumber) {
+        const currentPhaseRows = await db.execute(
+          `SELECT ph.phase_number FROM projects p
+           LEFT JOIN phases ph ON p.current_phase_id = ph.id
+           WHERE p.id = ?`,
+          [projectId]
+        );
+        targetPhaseNumber = currentPhaseRows[0]?.phase_number;
       }
 
-      query += `
-        GROUP BY sd.id, sd.sub_domain_name
-        ORDER BY sd.sub_domain_name
-      `;
+      if (!targetPhaseNumber) {
+        const latestPhase = await db.execute(
+          `SELECT phase_number FROM phases WHERE project_id = ? ORDER BY phase_number DESC LIMIT 1`,
+          [projectId]
+        );
+        if (latestPhase.length > 0) {
+          targetPhaseNumber = latestPhase[0].phase_number;
+        } else {
+          return res.status(404).json({ success: false, message: 'No phases found for project' });
+        }
+      }
 
-      const subDomainScores = await db.execute(query, params);
+      // Find the manager-approved inspection
+      const approvedInspections = await db.execute(
+        `SELECT id FROM inspections 
+         WHERE project_id = ? AND phase = ? AND manager_approval_status = 'approved'
+         LIMIT 1`,
+        [projectId, targetPhaseNumber]
+      );
 
-      const spiderData = subDomainScores.map(sd => {
-        const totalApplicable = sd.yes_count + sd.no_count; // Exclude N/A
-        const rating = totalApplicable > 0 ? (sd.yes_count / totalApplicable) * 10 : 0;
+      if (approvedInspections.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'No manager-approved inspection found. Spider chart is only available after manager approval.'
+        });
+      }
 
-        return {
-          subDomain: sd.sub_domain_name,
-          score: Math.round(rating * 10) / 10, // Rating out of 10 with 1 decimal
-          completion: sd.total_queries > 0 ? Math.round((sd.completed_queries / sd.total_queries) * 100) : 0,
-          totalQueries: sd.yes_count + sd.no_count + sd.na_count,
-          applicableQueries: totalApplicable,
-          yesCount: sd.yes_count,
-          noCount: sd.no_count,
-          naCount: sd.na_count
-        };
-      });
+      const inspectionId = approvedInspections[0].id;
 
-      // Calculate domain rating (average of all sub-domain scores)
-      const domainRating = spiderData.length > 0
-        ? Math.round((spiderData.reduce((sum, sd) => sum + sd.score, 0) / spiderData.length) * 10) / 10
-        : 0;
+      // Use scoring service to get properly calculated scores
+      const scoringResult = await scoringService.calculateInspectionScore(inspectionId);
+      
+      // Find the specific domain data
+      const domainData = (scoringResult.domains || []).find(d => d.domainId == domainId);
+      
+      if (!domainData) {
+        return res.status(404).json({
+          success: false,
+          message: 'Domain not found in scoring results'
+        });
+      }
+
+      const spiderData = (domainData.subDomains || []).map(sd => ({
+        subDomain: sd.subDomainName,
+        score: Math.round(sd.score / 10 * 10) / 10,
+        weightage: sd.weightage,
+        earnedMarks: sd.earnedMarks,
+        maxMarks: sd.maxMarks
+      }));
+
+      const domainRating = domainData.score;
 
       res.json({
         success: true,
         data: spiderData,
-        domainRating
+        domainRating: Math.round(domainRating * 10) / 10
       });
     } catch (error) {
       logger.error('Error in getDomainSpiderChart:', error);
@@ -347,7 +342,7 @@ class ProjectController {
           i.manager_approval_status,
           u_insp.name as inspector_name,
           u_rev.name as reviewer_name,
-          COALESCE(irh.history_count, 0) as history_count,
+          COALESCE(irh.rejection_count, 0) as history_count,
           irh.last_history_date,
           ph.created_at,
           ph.updated_at
@@ -356,6 +351,7 @@ class ProjectController {
         LEFT JOIN (
           SELECT inspection_id,
                  COUNT(*) AS history_count,
+                 COUNT(CASE WHEN action_type = 'rejected' THEN 1 END) AS rejection_count,
                  MAX(rejection_date) AS last_history_date
           FROM inspection_rejection_history
           GROUP BY inspection_id
