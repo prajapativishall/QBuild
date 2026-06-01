@@ -149,6 +149,7 @@ exports.getInspectionForReview = async (inspectionId, userId) => {
     LEFT JOIN responses r ON r.inspection_id = ?
       AND r.query_id = q.id 
       AND r.sub_domain_id = prq.sub_domain_id
+      AND (r.domain_id = prq.domain_id OR r.domain_id IS NULL)
     JOIN inspections i ON i.id = ?
     WHERE pq.project_id = (SELECT project_id FROM inspections WHERE id = ?) 
       AND pq.phase_number = i.phase

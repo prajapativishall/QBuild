@@ -103,6 +103,16 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
+  void _viewCompletedInspection(dynamic inspection) {
+    // For completed inspections, just show a summary or navigate to read-only view
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Inspection #${inspection['id']} completed'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   Color _getStatusColor(String status) {
     switch (status) {
       case 'pending':
@@ -126,6 +136,17 @@ class _DashboardScreenState extends State<DashboardScreen>
         return 'Completed';
       default:
         return 'Unknown';
+    }
+  }
+
+  String _formatDate(dynamic dateStr) {
+    if (dateStr == null || dateStr.toString().isEmpty) return '';
+    try {
+      final dt = DateTime.parse(dateStr.toString());
+      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+    } catch (e) {
+      return dateStr.toString();
     }
   }
 
@@ -489,8 +510,11 @@ class _DashboardScreenState extends State<DashboardScreen>
     final status = inspection['status'] ?? 'unknown';
     final isPending = status == 'pending';
     final isCompleted = status == 'completed';
-    final projectName = inspection['projectName'] ?? 'ATS TOWER C AC REPAIR';
-    final id = inspection['id'] ?? 57;
+    final projectName = inspection['projectName'] ?? inspection['project_name'] ?? 'Project';
+    final id = inspection['id'] ?? 0;
+    final location = inspection['location'] ?? inspection['siteAddress'] ?? '';
+    final inspectionDate = inspection['inspectionDate'] ?? inspection['inspection_date'] ?? '';
+    final phase = inspection['phase'] ?? '';
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -520,18 +544,19 @@ class _DashboardScreenState extends State<DashboardScreen>
                       Text(
                         projectName.toUpperCase(),
                         style: const TextStyle(
-                          fontSize: 22,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'ID: #$id',
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 14,
+                      const SizedBox(height: 4),
+                      if (phase != null && phase.toString().isNotEmpty)
+                        Text(
+                          'Phase $phase | ID: #$id',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 13,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -546,63 +571,90 @@ class _DashboardScreenState extends State<DashboardScreen>
                     style: TextStyle(
                       color: _getStatusColor(status),
                       fontWeight: FontWeight.w600,
+                      fontSize: 13,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
+            // Only location and date - NO description
             Row(
               children: [
                 const Icon(Icons.location_on_outlined, size: 18, color: Colors.grey),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    'Location: ${inspection['location'] ?? 'Tower C'}',
-                    style: const TextStyle(fontSize: 15),
+                    location.isNotEmpty ? location : 'No location',
+                    style: const TextStyle(fontSize: 14, color: Colors.black87),
                   ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
                 const Icon(Icons.calendar_today_outlined, size: 16, color: Colors.grey),
-                const SizedBox(width: 4),
+                const SizedBox(width: 6),
                 Text(
-                  inspection['scheduledDate'] ?? 'Oct 26, 2023',
-                  style: const TextStyle(fontSize: 14),
+                  _formatDate(inspectionDate),
+                  style: const TextStyle(fontSize: 14, color: Colors.black87),
                 ),
               ],
             ),
             const SizedBox(height: 18),
-            Text(
-              inspection['description'] ?? 'Check condenser fan motor',
-              style: const TextStyle(fontSize: 16),
-            ),
-            const SizedBox(height: 22),
-            SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: ElevatedButton(
-                onPressed: () => _startInspection(inspection),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFB00020),
-                  elevation: 3,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+            // Button - only for active inspections, NO "VIEW DETAILS" for completed
+            if (!isCompleted)
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () => _startInspection(inspection),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFB00020),
+                    elevation: 3,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  child: Text(
+                    isPending ? 'START INSPECTION' : 'CONTINUE INSPECTION',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
-                child: Text(
-                  isCompleted
-                      ? 'VIEW DETAILS'
-                      : isPending
-                          ? 'START INSPECTION'
-                          : 'CONTINUE INSPECTION',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    letterSpacing: 0.5,
-                  ),
+              )
+            else
+              // For completed inspections, show a simple completed badge instead of button
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: Colors.green.shade200),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green.shade600, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'COMPLETED',
+                      style: TextStyle(
+                        color: Colors.green.shade700,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
           ],
         ),
       ),

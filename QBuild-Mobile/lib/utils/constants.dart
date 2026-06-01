@@ -102,11 +102,11 @@ class AppConstants {
   // Detect platform and use appropriate base URL
   static String get baseUrl {
     if (kIsWeb) {
-      return 'http://192.168.1.53:3000/api';
+      return 'http://125.22.185.107:3000/api';
     } else {
       // Use laptop's IP for real devices (Android/iOS)
       // This allows physical devices to connect to development server
-      return 'http://192.168.1.53:3000/api';
+      return 'http://125.22.185.107:3000/api';
     }
   }
   

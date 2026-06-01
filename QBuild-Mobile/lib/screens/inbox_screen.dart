@@ -58,7 +58,6 @@ class _InboxScreenState extends State<InboxScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Inspection accepted successfully'))
         );
-        // Navigate back to dashboard which will auto-refresh on initState
         context.go('/dashboard');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -80,7 +79,7 @@ class _InboxScreenState extends State<InboxScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Inbox'),
-        // Refresh button removed - auto-refresh handles updates
+        elevation: 0,
       ),
       body: RefreshIndicator(
         onRefresh: _loadInbox,
@@ -100,36 +99,77 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   Widget _buildInspectionCard(dynamic inspection) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+    final location = inspection['location'] ?? inspection['site_address'] ?? '';
+    final phase = inspection['phase'] ?? '';
+    final projectName = inspection['project_name'] ?? inspection['projectName'] ?? 'Unknown Project';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.pending_actions_outlined,
+                    color: AppColors.warning,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        inspection['project_name'] ?? inspection['projectName'] ?? 'Unknown Project',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        projectName,
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        inspection['location'] ?? '',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                      ),
+                      if (location.isNotEmpty)
+                        Row(
+                          children: [
+                            Icon(Icons.location_on_outlined, size: 14, color: Colors.grey.shade500),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                location,
+                                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: AppColors.warning.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Text(
                     'Pending',
@@ -138,24 +178,42 @@ class _InboxScreenState extends State<InboxScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            if (inspection['projectDescription'] != null && inspection['projectDescription'].toString().isNotEmpty)
-              Text(
-                inspection['projectDescription'],
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
+            // Only show phase info, no description
+            Row(
+              children: [
+                if (phase != null && phase.toString().isNotEmpty) ...[
+                  Icon(Icons.layers_outlined, size: 16, color: Colors.grey.shade500),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Phase $phase',
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(width: 16),
+                ],
+                Icon(Icons.calendar_today_outlined, size: 14, color: Colors.grey.shade500),
+                const SizedBox(width: 4),
+                Text(
+                  'Assigned today',
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
             SizedBox(
               width: double.infinity,
+              height: 50,
               child: ElevatedButton.icon(
                 onPressed: () => _acceptInspection(inspection),
-                icon: const Icon(Icons.check, size: 18),
+                icon: const Icon(Icons.check_circle_outline, size: 20),
                 label: const Text('Accept Inspection'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.success,
+                  backgroundColor: const Color(0xFFB00020),
                   foregroundColor: Colors.white,
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
                 ),
               ),
             ),
@@ -178,13 +236,29 @@ class _InboxScreenState extends State<InboxScreen> {
     ),
   );
 
-  Widget _buildEmptyWidget() => const Center(
+  Widget _buildEmptyWidget() => Center(
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.inbox_outlined, size: 64, color: AppColors.textHint),
-        SizedBox(height: 16),
-        Text('No pending inspections', style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Icon(Icons.inbox_outlined, size: 40, color: AppColors.textHint),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'No pending inspections',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'New assigned inspections will appear here',
+          style: TextStyle(fontSize: 14, color: Colors.grey.shade400),
+        ),
       ],
     ),
   );
