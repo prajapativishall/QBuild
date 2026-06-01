@@ -206,19 +206,19 @@ class ProjectController {
       const spiderData = (scoringResult.domains || []).map(d => ({
         domain_id: d.domainId,
         domain: d.domainName,
-        score: Math.round(d.score / 10 * 10) / 10, // Convert percentage (0-100) to out-of-10 scale
+        score: Math.round((d.score / 10) * 10) / 10 || 0, // Convert percentage (0-100) to out-of-10
         weightage: d.weightage,
         subDomains: (d.subDomains || []).map(sd => ({
           subDomainId: sd.subDomainId,
           subDomainName: sd.subDomainName,
-          score: Math.round(sd.score / 10 * 10) / 10,
+          score: Math.round((sd.score / 10) * 10) / 10 || 0,
           weightage: sd.weightage,
           earnedMarks: sd.earnedMarks,
           maxMarks: sd.maxMarks
         }))
       }));
 
-      const overallRating = scoringResult.inspectionScore;
+      const overallRating = scoringResult.inspectionScore / 10; // Convert percentage to out-of-10
 
       res.json({
         success: true,
@@ -298,13 +298,13 @@ class ProjectController {
 
       const spiderData = (domainData.subDomains || []).map(sd => ({
         subDomain: sd.subDomainName,
-        score: Math.round(sd.score / 10 * 10) / 10,
+        score: Math.round((sd.score / 10) * 10) / 10 || 0,
         weightage: sd.weightage,
         earnedMarks: sd.earnedMarks,
         maxMarks: sd.maxMarks
       }));
 
-      const domainRating = domainData.score;
+      const domainRating = domainData.score / 10; // Convert percentage to out-of-10
 
       res.json({
         success: true,

@@ -81,27 +81,31 @@ class ScoringService {
         domainWeightages, domainResults
       );
 
-      // Build detailed breakdown
-      const result = {
-        inspectionId,
-        inspectionScore: Math.round(inspectionScore * 100) / 100,
-        grade: this.calculateGrade(inspectionScore),
-        domains: domainResults,
-        subDomains: subDomainResults,
-        queryClusterBreakdown: queryClusters.map(cluster => ({
-          subDomainId: cluster.subDomainId,
-          subDomainName: cluster.subDomainName,
+      // Build detailed breakdown (queryClusters is an object keyed by subDomainId, flatten to array)
+      const clusterBreakdown = Object.values(queryClusters).flatMap(sdCluster => 
+        (sdCluster.clusters || []).map(cluster => ({
+          subDomainId: sdCluster.subDomainId,
+          subDomainName: sdCluster.subDomainName,
           primaryQueryId: cluster.primaryQueryId,
           primaryQuestionText: cluster.primaryQuestionText,
           primaryResponse: cluster.primaryResponse,
-          secondaries: cluster.secondaries.map(s => ({
+          secondaries: (cluster.secondaries || []).map(s => ({
             queryId: s.queryId,
             questionText: s.questionText,
             response: s.response,
           })),
           clusterEarned: cluster.clusterEarned,
           clusterMax: cluster.clusterMax,
-        })),
+        }))
+      );
+
+      const result = {
+        inspectionId,
+        inspectionScore: Math.round(inspectionScore * 100) / 100,
+        grade: this.calculateGrade(inspectionScore),
+        domains: domainResults,
+        subDomains: subDomainResults,
+        queryClusterBreakdown: clusterBreakdown,
       };
 
       // Persist results
