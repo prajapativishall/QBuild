@@ -188,9 +188,9 @@ class ProjectController {
           d.domain_name,
           COUNT(DISTINCT CONCAT(pdsd.domain_id, '-', pdsd.sub_domain_id)) as total_subdomains,
           COUNT(DISTINCT CASE WHEN cr.id IS NOT NULL THEN CONCAT(pdsd.domain_id, '-', pdsd.sub_domain_id) END) as completed_subdomains,
-          COUNT(DISTINCT CASE WHEN UPPER(cr.response_value) = 'YES' THEN cr.id END) as yes_count,
-          COUNT(DISTINCT CASE WHEN UPPER(cr.response_value) = 'NO' THEN cr.id END) as no_count,
-          COUNT(DISTINCT CASE WHEN UPPER(cr.response_value) = 'NA' THEN cr.id END) as na_count
+          COUNT(DISTINCT CASE WHEN UPPER(cr.response) = 'YES' THEN cr.id END) as yes_count,
+          COUNT(DISTINCT CASE WHEN UPPER(cr.response) = 'NO' THEN cr.id END) as no_count,
+          COUNT(DISTINCT CASE WHEN UPPER(cr.response) = 'NA' THEN cr.id END) as na_count
         FROM phase_domains pd
         INNER JOIN domains d ON pd.domain_id = d.id
         INNER JOIN phase_domain_sub_domains pdsd ON pd.project_id = pdsd.project_id
@@ -262,9 +262,9 @@ class ProjectController {
           sd.sub_domain_name,
           COUNT(DISTINCT q.id) as total_queries,
           COUNT(DISTINCT CASE WHEN cr.id IS NOT NULL THEN q.id END) as completed_queries,
-          COUNT(DISTINCT CASE WHEN UPPER(cr.response_value) = 'YES' THEN cr.id END) as yes_count,
-          COUNT(DISTINCT CASE WHEN UPPER(cr.response_value) = 'NO' THEN cr.id END) as no_count,
-          COUNT(DISTINCT CASE WHEN UPPER(cr.response_value) = 'NA' THEN cr.id END) as na_count
+          COUNT(DISTINCT CASE WHEN UPPER(cr.response) = 'YES' THEN cr.id END) as yes_count,
+          COUNT(DISTINCT CASE WHEN UPPER(cr.response) = 'NO' THEN cr.id END) as no_count,
+          COUNT(DISTINCT CASE WHEN UPPER(cr.response) = 'NA' THEN cr.id END) as na_count
         FROM domain_sub_domains dsd
         INNER JOIN sub_domains sd ON dsd.sub_domain_id = sd.id
         INNER JOIN sub_domain_queries sdq ON sd.id = sdq.sub_domain_id
