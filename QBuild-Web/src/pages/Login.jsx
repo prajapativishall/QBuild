@@ -31,10 +31,6 @@ const Login = () => {
             className="login-logo"
           />
 
-          <p className="login-tagline">
-            Succeed with Quality
-          </p>
-
           <h2 className="login-title">
             Sign in to QBuild
           </h2>

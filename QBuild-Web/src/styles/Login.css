@@ -35,16 +35,10 @@
 }
 
 .login-logo {
-  height: 60px;
+  height: 80px;
   margin-bottom: 10px;
 }
 
-.login-tagline {
-  font-size: 14px;
-  color: #a11b2e;
-  margin-bottom: 14px;
-  font-style: italic;
-}
 
 .login-title {
   font-size: 24px;

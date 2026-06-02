@@ -626,6 +626,66 @@ const CreateInspectionForm = ({ project, sourcePhaseNumber, phaseNumber, mode = 
         stages={formData.stages}
         onSave={handleSaveQueriesForSection}
       />
+
+      {/* Weightage Warning Modal */}
+      {showWeightageWarning && (
+        <div className="modal-overlay" style={{ pointerEvents: 'none', zIndex: 1100 }}>
+          <div className="modal-content" style={{ pointerEvents: 'auto', maxWidth: '550px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title" style={{ color: '#f59e0b' }}>
+                ⚠️ Weightage Rule Violation
+              </h2>
+              <button className="modal-close" onClick={() => setShowWeightageWarning(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ color: '#6b7280', marginBottom: '16px', lineHeight: '1.5' }}>
+                The following weightage rules are broken. Domain weightages and sub-domain weightages within each domain should sum to 100%.
+              </p>
+              <div style={{
+                background: '#fffbeb',
+                border: '1px solid #fde68a',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '16px'
+              }}>
+                {weightageWarnings.map((warning, idx) => (
+                  <div key={idx} style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '8px',
+                    padding: '4px 0',
+                    color: '#92400e',
+                    fontSize: '14px'
+                  }}>
+                    <span style={{ flexShrink: 0 }}>•</span>
+                    <span>{warning}</span>
+                  </div>
+                ))}
+              </div>
+              <p style={{ color: '#6b7280', fontSize: '13px', lineHeight: '1.5' }}>
+                You can fix the weightages now, or proceed anyway. Proceeding with incorrect weightages may result in inaccurate score calculations.
+              </p>
+            </div>
+            <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowWeightageWarning(false)}
+              >
+                Fix Weightages
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ background: '#f59e0b', borderColor: '#f59e0b' }}
+                onClick={handleConfirmProceedWithWarnings}
+              >
+                Proceed Anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 };
