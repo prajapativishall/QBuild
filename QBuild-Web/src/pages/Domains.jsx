@@ -381,26 +381,29 @@ const Domains = () => {
 
               <div className="form-group">
                 <label className="form-label">Sub-Domains</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <input
-                    type="text"
-                    placeholder="Search sub-domains..."
-                    value={sectionSearchTerm}
-                    onChange={(e) => setSectionSearchTerm(e.target.value)}
-                    style={{
-                      padding: '6px 12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                      width: '100%'
-                    }}
-                  />
-                  <div style={{ display: 'flex', gap: '10px' }}>
+                <div className="subdomain-section">
+                  <div className="subdomain-section-header">
+                    <span className="subdomain-section-title">Linked Sub-Domains</span>
+                    <span className="subdomain-section-count">
+                      {formData.sub_domains?.length || 0} selected
+                    </span>
+                  </div>
+
+                  <div className="subdomain-search">
+                    <input
+                      type="text"
+                      className="subdomain-search-input"
+                      placeholder="Search sub-domains..."
+                      value={sectionSearchTerm}
+                      onChange={(e) => setSectionSearchTerm(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="subdomain-add-row">
                     <select
-                      className="form-select"
+                      className="subdomain-select"
                       value={selectedSectionId}
                       onChange={(e) => setSelectedSectionId(e.target.value)}
-                      style={{ flex: 1 }}
                     >
                       <option value="">Select sub-domain</option>
                       {sections
@@ -415,80 +418,70 @@ const Domains = () => {
                         </option>
                       ))}
                     </select>
-                    <button type="button" className="btn btn-secondary" onClick={handleAddSubDomain}>
-                      Add
+                    <button
+                      type="button"
+                      className="subdomain-add-btn"
+                      onClick={handleAddSubDomain}
+                      disabled={!selectedSectionId}
+                    >
+                      + Add
                     </button>
                   </div>
-                </div>
 
-                {formData.sub_domains?.length > 0 && (
-                  <div style={{ marginTop: '10px', display: 'grid', gap: '8px' }}>
-                    {formData.sub_domains.map((subDomain, idx) => (
-                      <div
-                        key={`${subDomain.subDomainId}-${idx}`}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '10px',
-                          border: '1px solid rgba(255,255,255,0.2)',
-                          borderRadius: '12px',
-                          background: 'rgba(255,255,255,0.8)'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-                          <span style={{ flex: 1 }}>
-                            {subDomain.subDomainName}
-                          </span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.01"
-                              style={{
-                                width: '70px',
-                                padding: '4px 8px',
-                                border: '1px solid #d1d5db',
-                                borderRadius: '4px',
-                                fontSize: '12px',
-                                textAlign: 'right'
-                              }}
-                              value={subDomain.weightage || 0}
-                              onChange={(e) => {
-                                const updatedSubDomains = [...formData.sub_domains];
-                                updatedSubDomains[idx] = {
-                                  ...updatedSubDomains[idx],
-                                  weightage: parseFloat(e.target.value) || 0
-                                };
-                                setFormData({ ...formData, sub_domains: updatedSubDomains });
-                              }}
-                            />
-                            <span style={{ fontSize: '12px', color: '#6b7280' }}>%</span>
+                  {formData.sub_domains?.length > 0 ? (
+                    <>
+                      <div className="subdomain-list">
+                        {formData.sub_domains.map((subDomain, idx) => (
+                          <div
+                            key={`${subDomain.subDomainId}-${idx}`}
+                            className="subdomain-item"
+                          >
+                            <div className="subdomain-item-info">
+                              <span className="subdomain-item-name">
+                                {subDomain.subDomainName}
+                              </span>
+                              <div className="subdomain-item-weightage">
+                                <input
+                                  type="number"
+                                  className="subdomain-weight-input"
+                                  min="0"
+                                  max="100"
+                                  step="0.01"
+                                  value={subDomain.weightage || 0}
+                                  onChange={(e) => {
+                                    const updatedSubDomains = [...formData.sub_domains];
+                                    updatedSubDomains[idx] = {
+                                      ...updatedSubDomains[idx],
+                                      weightage: parseFloat(e.target.value) || 0
+                                    };
+                                    setFormData({ ...formData, sub_domains: updatedSubDomains });
+                                  }}
+                                />
+                                <span className="subdomain-weight-label">%</span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className="subdomain-remove-btn"
+                              onClick={() => handleRemoveSubDomain(idx)}
+                              title="Remove sub-domain"
+                            >
+                              ✕
+                            </button>
                           </div>
-                        </div>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => handleRemoveSubDomain(idx)}
-                          style={{ padding: '6px 10px', marginLeft: '8px' }}
-                        >
-                          Remove
-                        </button>
+                        ))}
                       </div>
-                    ))}
-                    <div style={{ 
-                      marginTop: '8px', 
-                      padding: '8px', 
-                      background: '#f0f9ff', 
-                      borderRadius: '6px', 
-                      fontSize: '12px', 
-                      color: '#0369a1' 
-                    }}>
-                      Total Sub-Domain Weightage: {Number(formData.sub_domains.reduce((sum, subDomain) => sum + (subDomain.weightage || 0), 0)).toFixed(2)}%
+                      <div className="subdomain-total">
+                        <span>Total Weightage</span>
+                        <span>{Number(formData.sub_domains.reduce((sum, subDomain) => sum + (subDomain.weightage || 0), 0)).toFixed(2)}%</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="subdomain-empty">
+                      No sub-domains linked. Use the search and add button above to link sub-domains.
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               <div className="form-actions">

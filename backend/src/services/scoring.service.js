@@ -210,22 +210,24 @@ class ScoringService {
       }
     }
 
-    // Organize by sub-domain, then by cluster (primary + linked secondaries)
+    // Organize by domain:sub_domain pair, then by cluster (primary + linked secondaries)
+    // This prevents same sub-domain in different domains from merging their clusters
     const clustersBySubDomain = {};
 
     for (const row of queryRows) {
-      const sdId = row.subDomainId;
-      if (!clustersBySubDomain[sdId]) {
-        clustersBySubDomain[sdId] = {
-          subDomainId: sdId,
-          subDomainName: subDomainNames[sdId] || `Sub-domain ${sdId}`,
+      const compositeKey = `${row.domainId}:${row.subDomainId}`;
+      if (!clustersBySubDomain[compositeKey]) {
+        clustersBySubDomain[compositeKey] = {
+          domainId: row.domainId,
+          subDomainId: row.subDomainId,
+          subDomainName: subDomainNames[row.subDomainId] || `Sub-domain ${row.subDomainId}`,
           clusters: [],
         };
       }
 
       if (row.queryType === 'primary') {
         // Start a new cluster
-        clustersBySubDomain[sdId].clusters.push({
+        clustersBySubDomain[compositeKey].clusters.push({
           primaryQueryId: row.queryId,
           primaryQuestionText: row.questionText,
           primaryResponse: null, // Will be filled with response later
@@ -237,7 +239,7 @@ class ScoringService {
         const parentQueryId = sdqToQueryId[row.subDomainQueryParentId];
         if (parentQueryId) {
           // Find the cluster this secondary belongs to
-          const sdClusters = clustersBySubDomain[sdId].clusters;
+          const sdClusters = clustersBySubDomain[compositeKey].clusters;
           const parentCluster = sdClusters.find(c => c.primaryQueryId === parentQueryId);
           if (parentCluster) {
             parentCluster.secondaries.push({
@@ -258,7 +260,7 @@ class ScoringService {
    */
   async loadResponses(inspectionId) {
     const rows = await db.execute(
-      `SELECT query_id as queryId, response, sub_domain_id as subDomainId
+      `SELECT query_id as queryId, response, sub_domain_id as subDomainId, domain_id as domainId
        FROM responses
        WHERE inspection_id = ?`,
       [inspectionId]
@@ -283,23 +285,25 @@ class ScoringService {
    *   N/A → no penalty (already reduced max marks)
    */
   calculateAllSubDomainScores(subDomainWeightages, queryClusters, responses) {
-    // Build a lookup: (subDomainId, queryId) -> responseValue
+    // Build a lookup: (domainId:subDomainId:queryId) -> responseValue
+    // Using domainId in the key prevents same sub-domain in different domains
+    // from overwriting each other's responses
     const responseMap = {};
     for (const r of responses) {
-      const key = `${r.subDomainId}:${r.queryId}`;
+      const key = `${r.domainId || 'null'}:${r.subDomainId}:${r.queryId}`;
       responseMap[key] = r.response;
     }
 
     const results = [];
 
     for (const sdWeight of subDomainWeightages) {
-      const sdId = sdWeight.subDomainId;
-      const sdClusterData = queryClusters[sdId];
+      const compositeKey = `${sdWeight.domainId}:${sdWeight.subDomainId}`;
+      const sdClusterData = queryClusters[compositeKey];
 
       if (!sdClusterData || !sdClusterData.clusters || sdClusterData.clusters.length === 0) {
         // No clusters for this sub-domain → score = 0
         results.push({
-          subDomainId: sdId,
+          subDomainId: sdWeight.subDomainId,
           subDomainName: sdWeight.subDomainName,
           domainId: sdWeight.domainId,
           weightage: sdWeight.weightage,
@@ -317,12 +321,12 @@ class ScoringService {
       const clusterResults = [];
 
       for (const cluster of sdClusterData.clusters) {
-        const primaryResponse = responseMap[`${sdId}:${cluster.primaryQueryId}`] || null;
+        const primaryResponse = responseMap[`${sdWeight.domainId}:${sdWeight.subDomainId}:${cluster.primaryQueryId}`] || null;
         cluster.primaryResponse = primaryResponse;
 
         // Attach responses to secondaries
         const secondaryResults = cluster.secondaries.map(s => {
-          const resp = responseMap[`${sdId}:${s.queryId}`] || null;
+          const resp = responseMap[`${sdWeight.domainId}:${sdWeight.subDomainId}:${s.queryId}`] || null;
           s.response = resp;
           return { ...s, response: resp };
         });
@@ -400,7 +404,7 @@ class ScoringService {
       const score = totalMax > 0 ? (totalEarned / totalMax) * 100 : 0;
 
       results.push({
-        subDomainId: sdId,
+        subDomainId: sdWeight.subDomainId,
         subDomainName: sdWeight.subDomainName,
         domainId: sdWeight.domainId,
         weightage: sdWeight.weightage,
