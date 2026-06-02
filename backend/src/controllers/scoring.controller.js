@@ -262,21 +262,21 @@ class ScoringController {
     try {
       const db = require('../config/db');
       
-      // Get sub_domain scores
+      // Get sub_domain scores (with domain_id to distinguish same sub-domain across domains)
       const subDomainScoresQuery = `
         SELECT 
           ss.sub_domain_id,
+          ss.domain_id,
           ss.secured_points,
           ss.max_points,
           ss.sub_domain_rating,
-          s.sub_domain_name,
-          s.domain_id,
+          COALESCE(s.sub_domain_name, 'Unknown') as sub_domain_name,
           d.domain_name
         FROM sub_domain_scores ss
-        JOIN sub_domains s ON ss.sub_domain_id = s.id
-        JOIN domains d ON s.domain_id = d.id
+        LEFT JOIN sub_domains s ON ss.sub_domain_id = s.id
+        LEFT JOIN domains d ON ss.domain_id = d.id
         WHERE ss.inspection_id = ?
-        ORDER BY s.id ASC
+        ORDER BY ISNULL(ss.domain_id), d.domain_name, s.sub_domain_name
       `;
       
       const subDomainScores = await db.execute(subDomainScoresQuery, [inspectionId]);

@@ -9,16 +9,22 @@ const logger = require('../utils/logger');
 
 class DatabaseConnection {
   constructor() {
+    // Set Node.js to Asia/Kolkata timezone for consistent timestamp handling
+    if (!process.env.TZ) {
+      process.env.TZ = 'Asia/Kolkata';
+    }
     this.pool = null;
  console.log('DB_USER:', process.env.DB_USER);
   console.log('DB_HOST:', process.env.DB_HOST);
   console.log('DB_NAME:', process.env.DB_NAME);
+  console.log('TZ:', process.env.TZ);
     this.config = {
       host: process.env.DB_HOST,
       port: process.env.DB_PORT,
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
+      timezone: '+05:30',
       waitForConnections: true,
       connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 10,
       queueLimit: parseInt(process.env.DB_QUEUE_LIMIT) || 0,
@@ -712,11 +718,16 @@ class DatabaseConnection {
     `);
 
     // Create responses table if not exists
+    // IMPORTANT: sub_domain_id and domain_id columns are needed because the same query_id
+    // can be used in different domains with the same sub_domain. Without domain_id in the
+    // unique key, UPSERT queries would overwrite one domain's response with another's.
     await this.execute(`
       CREATE TABLE IF NOT EXISTS responses (
         id INT AUTO_INCREMENT PRIMARY KEY,
         inspection_id INT NOT NULL,
         query_id INT NOT NULL,
+        sub_domain_id INT NULL,
+        domain_id INT NULL,
         response VARCHAR(255) NOT NULL,
         nc_type VARCHAR(50), -- Non-Conformance type: Critical, Major, Minor, OFI
         inspector_comment TEXT, -- Inspector comment/observation
@@ -730,13 +741,58 @@ class DatabaseConnection {
         FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE CASCADE,
         FOREIGN KEY (query_id) REFERENCES queries(id) ON DELETE CASCADE,
         FOREIGN KEY (submitted_by) REFERENCES users(id) ON DELETE SET NULL,
-        UNIQUE KEY unique_inspection_query (inspection_id, query_id),
+        UNIQUE KEY unique_inspection_query_domain (inspection_id, query_id, domain_id),
         INDEX idx_inspection_id (inspection_id),
         INDEX idx_query_id (query_id),
+        INDEX idx_sub_domain_id (sub_domain_id),
+        INDEX idx_domain_id (domain_id),
         INDEX idx_response_value (response),
         INDEX idx_nc_type (nc_type)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
+
+    // Ensure sub_domain_id and domain_id exist on responses table (for existing installations)
+    if (await tableExists('responses')) {
+      await ensureColumn('responses', 'sub_domain_id', 'ALTER TABLE responses ADD COLUMN sub_domain_id INT NULL AFTER query_id');
+      await ensureColumn('responses', 'domain_id', 'ALTER TABLE responses ADD COLUMN domain_id INT NULL AFTER sub_domain_id');
+      
+      // Migrate unique key to include domain_id if it still uses the old unique_inspection_query
+      try {
+        const oldKeyExists = await this.executeOne(`
+          SELECT 1 as ok FROM information_schema.table_constraints
+          WHERE table_schema = DATABASE()
+            AND table_name = 'responses'
+            AND constraint_name = 'unique_inspection_query'
+            AND constraint_type = 'UNIQUE'
+        `);
+        if (oldKeyExists) {
+          await this.execute('ALTER TABLE responses DROP INDEX unique_inspection_query');
+          logger.info('Migrated responses unique key: dropped unique_inspection_query');
+        }
+      } catch (e) {
+        logger.debug('Unique key migration for responses:', e.message);
+      }
+      
+      // Add new composite unique key if it doesn't exist
+      try {
+        const newKeyExists = await this.executeOne(`
+          SELECT 1 as ok FROM information_schema.table_constraints
+          WHERE table_schema = DATABASE()
+            AND table_name = 'responses'
+            AND constraint_name = 'unique_inspection_query_domain'
+            AND constraint_type = 'UNIQUE'
+        `);
+        if (!newKeyExists) {
+          await this.execute('ALTER TABLE responses ADD UNIQUE KEY unique_inspection_query_domain (inspection_id, query_id, domain_id)');
+          logger.info('Migrated responses unique key: added unique_inspection_query_domain');
+        }
+      } catch (e) {
+        logger.debug('Unique key migration for responses:', e.message);
+      }
+
+      await ensureIndex('responses', 'sub_domain_id', 'ALTER TABLE responses ADD INDEX idx_sub_domain_id (sub_domain_id)');
+      await ensureIndex('responses', 'domain_id', 'ALTER TABLE responses ADD INDEX idx_domain_id (domain_id)');
+    }
 
 
     await this.execute(`
@@ -926,6 +982,48 @@ class DatabaseConnection {
         INDEX idx_rejection_date (rejection_date)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
+
+    // Ensure sub_domain_scores table has domain_id column
+    if (await tableExists('sub_domain_scores')) {
+      await ensureColumn('sub_domain_scores', 'domain_id', 'ALTER TABLE sub_domain_scores ADD COLUMN domain_id INT NULL AFTER sub_domain_id');
+      
+      // Migrate unique key to include domain_id
+      try {
+        const oldKeyExists = await this.executeOne(`
+          SELECT 1 as ok FROM information_schema.table_constraints
+          WHERE table_schema = DATABASE()
+            AND table_name = 'sub_domain_scores'
+            AND constraint_name = 'uq_inspection_sub_domain'
+            AND constraint_type = 'UNIQUE'
+        `);
+        if (oldKeyExists) {
+          await this.execute('ALTER TABLE sub_domain_scores DROP INDEX uq_inspection_sub_domain');
+          logger.info('Migrated sub_domain_scores unique key');
+        }
+      } catch (e) {
+        logger.debug('sub_domain_scores unique key migration:', e.message);
+      }
+    } else {
+      // Create sub_domain_scores table if it doesn't exist
+      await this.execute(`
+        CREATE TABLE IF NOT EXISTS sub_domain_scores (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          inspection_id INT NOT NULL,
+          sub_domain_id INT NOT NULL,
+          domain_id INT NULL,
+          secured_points DECIMAL(10,2) DEFAULT 0,
+          max_points DECIMAL(10,2) DEFAULT 0,
+          sub_domain_rating DECIMAL(5,2) DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE CASCADE,
+          UNIQUE KEY uq_inspection_sub_domain_domain (inspection_id, sub_domain_id, domain_id),
+          INDEX idx_inspection_id (inspection_id),
+          INDEX idx_sub_domain_id (sub_domain_id),
+          INDEX idx_domain_id (domain_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+      logger.info('Created sub_domain_scores table');
+    }
 
     logger.info('Schema check completed successfully');
   }

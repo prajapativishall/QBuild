@@ -483,9 +483,9 @@ class ScoringService {
       for (const sd of subDomainResults) {
         await db.execute(
           `INSERT INTO sub_domain_scores 
-           (inspection_id, sub_domain_id, secured_points, max_points, sub_domain_rating)
-           VALUES (?, ?, ?, ?, ?)`,
-          [inspectionId, sd.subDomainId, sd.earnedMarks, sd.maxMarks, sd.score]
+           (inspection_id, sub_domain_id, domain_id, secured_points, max_points, sub_domain_rating)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [inspectionId, sd.subDomainId, sd.domainId, sd.earnedMarks, sd.maxMarks, sd.score]
         );
       }
 
