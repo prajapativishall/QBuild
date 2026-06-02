@@ -182,11 +182,11 @@ class ScoringService {
         sq.parent_id as subDomainQueryParentId,
         sq.id as subDomainQueryId
        FROM phase_queries pq
-       JOIN project_queries prq ON pq.project_query_id = prq.id
-       JOIN queries q ON prq.query_id = q.id
-       LEFT JOIN sub_domain_queries sq ON q.id = sq.query_id AND sq.sub_domain_id = prq.sub_domain_id
+       LEFT JOIN project_queries prq ON pq.project_query_id = prq.id
+       JOIN queries q ON pq.query_id = q.id
+       LEFT JOIN sub_domain_queries sq ON q.id = sq.query_id AND sq.sub_domain_id = pq.sub_domain_id
        WHERE pq.project_id = ? AND pq.phase_number = ?
-       ORDER BY prq.sub_domain_id, sq.item_order, q.id`,
+       ORDER BY pq.sub_domain_id, sq.item_order, q.id`,
       [projectId, phaseNumber]
     );
 

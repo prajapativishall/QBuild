@@ -260,10 +260,10 @@ const getSubDomainQueries = async (req, res, next) => {
       SELECT 
         q.id,
         q.question_text,
-        prq.id as project_query_id,
+        pq.project_query_id,
         COALESCE(prq.query_type, sq.query_type, 'primary') as query_type,
         COALESCE(parent_sq.query_id, NULL) as parent_id,
-        COALESCE(sq.item_order, prq.id) as item_order,
+        COALESCE(sq.item_order, pq.id) as item_order,
         r.response as response,
         r.nc_type,
         r.inspector_comment,
@@ -275,22 +275,23 @@ const getSubDomainQueries = async (req, res, next) => {
         r.editable_by_inspector,
         i.phase as inspection_phase
       FROM phase_queries pq
-      JOIN project_queries prq ON pq.project_query_id = prq.id
-      JOIN queries q ON prq.query_id = q.id
-      LEFT JOIN sub_domain_queries sq ON q.id = sq.query_id AND sq.sub_domain_id = prq.sub_domain_id
+      LEFT JOIN project_queries prq ON pq.project_query_id = prq.id
+      JOIN queries q ON pq.query_id = q.id
+      LEFT JOIN sub_domain_queries sq ON q.id = sq.query_id AND sq.sub_domain_id = pq.sub_domain_id
       LEFT JOIN sub_domain_queries parent_sq ON parent_sq.id = sq.parent_id
       LEFT JOIN responses r ON q.id = r.query_id 
         AND r.inspection_id = ? 
-        AND r.sub_domain_id = ?
-        AND (r.domain_id = ? OR r.domain_id IS NULL)
+        AND r.sub_domain_id = pq.sub_domain_id
+        AND (r.domain_id = pq.domain_id OR r.domain_id IS NULL)
       JOIN inspections i ON i.id = ?
       WHERE pq.project_id = ? 
         AND pq.phase_number = ?
-        AND prq.sub_domain_id = ?
+        AND pq.domain_id = ?
+        AND pq.sub_domain_id = ?
         AND i.inspector_id = ?
-      ORDER BY COALESCE(sq.item_order, prq.id)
+      ORDER BY COALESCE(sq.item_order, pq.id)
     `;
-    const queryParams = [inspectionId, subDomainId, domainId, inspectionId, projectId, inspectionPhase, subDomainId, userId];
+    const queryParams = [inspectionId, inspectionId, projectId, inspectionPhase, domainId, subDomainId, userId];
 
     const queries = await db.execute(query, queryParams);
 

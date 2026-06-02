@@ -857,17 +857,16 @@ class ProjectController {
       // Get queries for each sub-domain
       const queries = await db.execute(
         `SELECT 
-          prq.query_id,
-          prq.domain_id,
-          prq.sub_domain_id,
+          pq.query_id,
+          pq.domain_id,
+          pq.sub_domain_id,
           COALESCE(sq.query_type, 'primary') as query_type,
           COALESCE(sq.parent_id, NULL) as parent_id,
           pq.weightage,
           q.question_text
         FROM phase_queries pq
-        JOIN project_queries prq ON pq.project_query_id = prq.id
-        JOIN queries q ON prq.query_id = q.id
-        LEFT JOIN sub_domain_queries sq ON q.id = sq.query_id AND sq.sub_domain_id = prq.sub_domain_id
+        JOIN queries q ON pq.query_id = q.id
+        LEFT JOIN sub_domain_queries sq ON q.id = sq.query_id AND sq.sub_domain_id = pq.sub_domain_id
         WHERE pq.project_id = ? AND pq.phase_number = ?`,
         [projectId, phaseNumber]
       );
@@ -883,7 +882,7 @@ class ProjectController {
           .filter(sd => sd.domain_id === domain.domain_id)
           .map(sd => {
             const subDomainQueries = safeQueries
-              .filter(q => q.sub_domain_id === sd.sub_domain_id)
+              .filter(q => q.domain_id === sd.domain_id && q.sub_domain_id === sd.sub_domain_id)
               .map(q => ({
                 id: q.query_id,
                 text: q.question_text,

@@ -153,10 +153,10 @@ const getInspectionForManagerReview = async (req, res, next) => {
       q.question_text,
       COALESCE(prq.query_type, sq.query_type, 'primary') as query_type,
       COALESCE(parent_sq.query_id, NULL) as parent_id,
-      COALESCE(sq.item_order, prq.id) as item_order,
-      prq.sub_domain_id,
+      COALESCE(sq.item_order, pq.id) as item_order,
+      pq.sub_domain_id,
       sd.sub_domain_name,
-      prq.domain_id,
+      pq.domain_id,
       d.domain_name,
       r.response as response,
       r.nc_type as nctype,
@@ -165,20 +165,20 @@ const getInspectionForManagerReview = async (req, res, next) => {
       r.photos as site_photos,
       r.submitted_at
     FROM phase_queries pq
-    JOIN project_queries prq ON pq.project_query_id = prq.id
-    JOIN queries q ON prq.query_id = q.id
-    JOIN sub_domains sd ON prq.sub_domain_id = sd.id
-    JOIN domains d ON prq.domain_id = d.id
-    LEFT JOIN sub_domain_queries sq ON q.id = sq.query_id AND sq.sub_domain_id = prq.sub_domain_id
+    LEFT JOIN project_queries prq ON pq.project_query_id = prq.id
+    JOIN queries q ON pq.query_id = q.id
+    JOIN sub_domains sd ON pq.sub_domain_id = sd.id
+    JOIN domains d ON pq.domain_id = d.id
+    LEFT JOIN sub_domain_queries sq ON q.id = sq.query_id AND sq.sub_domain_id = pq.sub_domain_id
     LEFT JOIN sub_domain_queries parent_sq ON parent_sq.id = sq.parent_id
     LEFT JOIN responses r ON r.inspection_id = ?
       AND r.query_id = q.id
-      AND r.sub_domain_id = prq.sub_domain_id
-      AND (r.domain_id = prq.domain_id OR r.domain_id IS NULL)
+      AND r.sub_domain_id = pq.sub_domain_id
+      AND (r.domain_id = pq.domain_id OR r.domain_id IS NULL)
     JOIN inspections i ON i.id = ?
       WHERE pq.project_id = (SELECT project_id FROM inspections WHERE id = ?) 
         AND pq.phase_number = i.phase
-      ORDER BY d.domain_name ASC, sd.sub_domain_name ASC, COALESCE(sq.item_order, prq.id) ASC
+      ORDER BY d.domain_name ASC, sd.sub_domain_name ASC, COALESCE(sq.item_order, pq.id) ASC
     `;
 
     const queries = await db.execute(queriesQuery, [inspectionId, inspectionId, inspectionId]);
