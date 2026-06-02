@@ -492,15 +492,26 @@
   color: var(--error-600);
 }
 
-/* Form Styles */
-.stage-form {
+/* Modal Body & Actions (matching SubDomains pattern) */
+.modal-body {
+  padding: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-5);
-  max-height: 70vh;
-  overflow-y: auto;
-  padding-right: var(--spacing-2);
 }
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-3);
+  padding-top: var(--spacing-5);
+  margin-top: var(--spacing-2);
+  border-top: 1px solid var(--secondary-200);
+  flex-shrink: 0;
+}
+
+/* Form Styles */
 
 .form-row {
   display: grid;

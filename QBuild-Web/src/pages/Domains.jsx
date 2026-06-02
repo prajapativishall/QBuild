@@ -324,8 +324,8 @@ const Domains = () => {
       )}
 
       {showForm && (
-        <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" style={{ pointerEvents: 'none' }} onClick={() => setShowForm(false)}>
+          <div className="modal-content" style={{ pointerEvents: 'auto', maxWidth: '800px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">{editingId ? 'Edit Domain' : 'Create Domain'}</h2>
               <button className="modal-close" onClick={() => setShowForm(false)}>
@@ -333,11 +333,12 @@ const Domains = () => {
               </button>
             </div>
 
-            <div className="stage-form">
+            <div className="modal-body">
               <div className="form-group">
-                <label className="form-label">Domain Name</label>
+                <label className="form-label">Domain Name *</label>
                 <input
                   className="form-input"
+                  placeholder="Enter domain name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 />
@@ -347,6 +348,8 @@ const Domains = () => {
                 <label className="form-label">Description</label>
                 <textarea
                   className="form-textarea"
+                  rows={3}
+                  placeholder="Enter domain description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
@@ -364,9 +367,9 @@ const Domains = () => {
                   onChange={(e) => setFormData({ ...formData, weightage: parseFloat(e.target.value) || 0 })}
                   placeholder="Enter weightage percentage (0-100)"
                 />
-                <small style={{ color: '#6b7280', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                <span className="form-hint">
                   Weightage percentage for this domain (0-100). Total of all domains should equal 100%.
-                </small>
+                </span>
               </div>
 
               <div className="form-checkbox-group">
@@ -483,15 +486,15 @@ const Domains = () => {
                   )}
                 </div>
               </div>
+            </div>
 
-              <div className="form-actions">
-                <button className="btn btn-secondary" type="button" onClick={() => setShowForm(false)}>
-                  Cancel
-                </button>
-                <button className="btn btn-primary" type="button" onClick={handleSave}>
-                  {editingId ? 'Update' : 'Create'}
-                </button>
-              </div>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" type="button" onClick={() => setShowForm(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" type="button" onClick={handleSave}>
+                {editingId ? 'Update Domain' : 'Create Domain'}
+              </button>
             </div>
           </div>
         </div>

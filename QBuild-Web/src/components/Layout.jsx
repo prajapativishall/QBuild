@@ -51,24 +51,38 @@ const Layout = () => {
         
         <nav className="sidebar-nav">
           {user?.role === 'reviewer' ? (
-            // Reviewer - show inspections and dashboard
-            <div className="sidebar-nav-section">
-              <h3 className="sidebar-nav-title">Reviewer</h3>
-              <ul className="sidebar-nav-list">
-                <li className="sidebar-nav-item">
-                  <a
-                    href="/reviewer-dashboard"
-                    className={`sidebar-nav-link ${isActiveRoute('/reviewer-dashboard') ? 'active' : ''}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleNavigation('/reviewer-dashboard');
-                    }}
-                  >
-                    <span className="sidebar-nav-text">Inspections</span>
-                  </a>
-                </li>
-              </ul>
-            </div>
+            // Reviewer - show dashboard and inspections
+            <>
+              <div className="sidebar-nav-section">
+                <h3 className="sidebar-nav-title">Main</h3>
+                <ul className="sidebar-nav-list">
+                  <li className="sidebar-nav-item">
+                    <a
+                      href="/dashboard"
+                      className={`sidebar-nav-link ${isActiveRoute('/dashboard') ? 'active' : ''}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleNavigation('/dashboard');
+                      }}
+                    >
+                      <span className="sidebar-nav-text">Dashboard</span>
+                    </a>
+                  </li>
+                  <li className="sidebar-nav-item">
+                    <a
+                      href="/reviewer-dashboard"
+                      className={`sidebar-nav-link ${isActiveRoute('/reviewer-dashboard') ? 'active' : ''}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleNavigation('/reviewer-dashboard');
+                      }}
+                    >
+                      <span className="sidebar-nav-text">Inspections</span>
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </>
           ) : user?.role === 'manager' ? (
             <React.Fragment>
               <div className="sidebar-nav-section">

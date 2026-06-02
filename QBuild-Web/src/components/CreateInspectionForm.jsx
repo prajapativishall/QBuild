@@ -42,10 +42,42 @@ const normalizeWeights100 = (items, getWeight, setWeight) => {
   return items.map((it, idx) => setWeight({ ...it }, scaled[idx]));
 };
 
+/**
+ * Validate weightage totals and return array of warning messages.
+ * Returns empty array if all weightages sum to 100%.
+ */
+const validateWeightages = (stages) => {
+  const warnings = [];
+
+  if (!stages || stages.length === 0) {
+    return ['No domains configured. At least one domain is required.'];
+  }
+
+  // Check domain weightages total = 100%
+  const domainTotal = round2(stages.reduce((sum, s) => sum + (s.weightage || 0), 0));
+  if (Math.abs(domainTotal - 100) > 0.01) {
+    warnings.push(`Domain weightages total ${domainTotal}% — must equal 100%.`);
+  }
+
+  // Check sub-domain weightages within each domain
+  stages.forEach((stage) => {
+    if (!stage.sections || stage.sections.length === 0) return;
+    const sdTotal = round2(stage.sections.reduce((sum, sec) => sum + (sec.weightage || 0), 0));
+    if (Math.abs(sdTotal - 100) > 0.01) {
+      warnings.push(`"${stage.stageName}" sub-domain weightages total ${sdTotal}% — must equal 100%.`);
+    }
+  });
+
+  return warnings;
+};
+
 const CreateInspectionForm = ({ project, sourcePhaseNumber, phaseNumber, mode = 'create', onClose, onSuccess }) => {
   const isEditMode = mode === 'edit' && phaseNumber;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [weightageWarnings, setWeightageWarnings] = useState([]);
+  const [showWeightageWarning, setShowWeightageWarning] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState(false);
   const [users, setUsers] = useState([]);
   const [availableStages, setAvailableStages] = useState([]);
   const [selectedStageId, setSelectedStageId] = useState('');
@@ -131,8 +163,23 @@ const CreateInspectionForm = ({ project, sourcePhaseNumber, phaseNumber, mode = 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Validate weightages before submission
+    const warnings = validateWeightages(formData.stages);
+    if (warnings.length > 0) {
+      setWeightageWarnings(warnings);
+      setShowWeightageWarning(true);
+      setPendingSubmit(true);
+      return; // Don't submit until user confirms via warning modal
+    }
+
+    await doSubmit();
+  };
+
+  const doSubmit = async () => {
     try {
       setSaving(true);
+      setShowWeightageWarning(false);
 
       const mappedDomains = (formData.stages || []).map(stage => ({
         domainId: stage.stageId,
@@ -179,6 +226,11 @@ const CreateInspectionForm = ({ project, sourcePhaseNumber, phaseNumber, mode = 
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleConfirmProceedWithWarnings = () => {
+    setPendingSubmit(false);
+    doSubmit();
   };
 
   const handleAddStage = async () => {
