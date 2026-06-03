@@ -1222,15 +1222,9 @@
 
 .question-text:hover {
   max-height: none;
-  z-index: 10;
-  background: var(--white);
-  box-shadow: var(--shadow-md);
+  background: var(--secondary-50);
   padding: var(--spacing-1);
   border-radius: var(--radius-sm);
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
 }
 
 .comment-text {
@@ -1244,15 +1238,9 @@
 
 .comment-text:hover {
   max-height: none;
-  z-index: 10;
-  background: var(--white);
-  box-shadow: var(--shadow-md);
+  background: var(--secondary-50);
   padding: var(--spacing-1);
   border-radius: var(--radius-sm);
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
 }
 
 .response-badge {
