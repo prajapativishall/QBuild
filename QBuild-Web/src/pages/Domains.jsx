@@ -4,6 +4,7 @@ import { domainApi, subDomainApi } from '../services/api';
 import '../styles/Domains.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
+const PAGE_SIZE = 25;
 
 const Domains = () => {
   const { isManager } = useAuth();
@@ -17,8 +18,7 @@ const Domains = () => {
     name: '',
     description: '',
     isActive: true,
-    weightage: 0,
-    sections: []
+    sub_domains: []
   });
 
   const [selectedSectionId, setSelectedSectionId] = useState('');
@@ -26,13 +26,14 @@ const Domains = () => {
   const [sectionSearchTerm, setSectionSearchTerm] = useState('');
   const [sections, setSections] = useState([]);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('Loading domains and sub_domains...');
       const [domainRes, subDomainRes] = await Promise.all([domainApi.getAll(), subDomainApi.getAll()]);
-      console.log('API responses:', { domainRes, subDomainRes });
       
       const domainsData = domainRes?.data || [];
       const sectionsData = subDomainRes?.data || [];
@@ -44,10 +45,8 @@ const Domains = () => {
         }
       });
       const domainSubDomainsData = await domainSubDomainsRes.json();
-      console.log('Domain-sub-domain relationships:', domainSubDomainsData);
       
       // Enrich domains with their associated sub-domains from junction table
-      // Backend returns: domain_id, sub_domain_id, sub_domain_name (snake_case)
       const enrichedDomains = domainsData.map(domain => {
         const domainSubDomains = (domainSubDomainsData.data || [])
           .filter(dsd => dsd.domain_id === domain.id)
@@ -57,19 +56,15 @@ const Domains = () => {
             weightage: dsd.weightage || 0
           }));
         
-        console.log(`Domain ${domain.id} (${domain.name}) has ${domainSubDomains.length} sub-domains:`, domainSubDomains);
-        
         return {
           ...domain,
           sub_domains: domainSubDomains
         };
       });
       
-      console.log('Enriched domains:', enrichedDomains);
       setDomains(enrichedDomains);
       setSections(sectionsData);
     } catch (e) {
-      console.error('Error in loadData:', e);
       setError(e.message || 'Failed to load domains');
     } finally {
       setLoading(false);
@@ -79,6 +74,11 @@ const Domains = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const filteredDomains = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -91,28 +91,30 @@ const Domains = () => {
     });
   }, [domains, searchTerm]);
 
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(filteredDomains.length / PAGE_SIZE));
+  const paginatedDomains = filteredDomains.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
+  const handlePageChange = (page) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
   const handleCreate = () => {
     setEditingId(null);
-    setFormData({
-      name: '',
-      description: '',
-      isActive: true,
-      weightage: 0,
-      sections: []
-    });
+    setFormData({ name: '', description: '', isActive: true, sub_domains: [] });
     setSelectedSectionId('');
     setShowForm(true);
   };
 
   const handleEdit = (domain) => {
-    console.log('Editing domain:', domain);
-    console.log('Domain sub_domains with weightage:', domain.sub_domains);
     setEditingId(domain.id);
     setFormData({
       name: domain.name || '',
       description: domain.description || '',
       isActive: domain.isActive !== false,
-      weightage: domain.weightage || 0,
       sub_domains: domain.sub_domains || []
     });
     setSelectedSectionId('');
@@ -124,15 +126,9 @@ const Domains = () => {
     const subDomain = sections.find((s) => s.id === parseInt(selectedSectionId));
     if (!subDomain) return;
 
-    const next = {
-      subDomainId: subDomain.id,
-      subDomainName: subDomain.name,
-      weightage: 0 // Default weightage since sub-domains don't have weightage in their own table
-    };
-
     setFormData((prev) => ({
       ...prev,
-      sub_domains: [...(prev.sub_domains || []), next]
+      sub_domains: [...(prev.sub_domains || []), { subDomainId: subDomain.id, subDomainName: subDomain.name, weightage: 0 }]
     }));
     setSelectedSectionId('');
   };
@@ -159,16 +155,14 @@ const Domains = () => {
         await domainApi.update(editingId, {
           name: formData.name,
           description: formData.description,
-          isActive: formData.isActive,
-          weightage: formData.weightage
+          isActive: formData.isActive
         });
         domainId = editingId;
       } else {
         const response = await domainApi.create({
           name: formData.name,
           description: formData.description,
-          isActive: formData.isActive,
-          weightage: formData.weightage
+          isActive: formData.isActive
         });
         domainId = response.data.id;
       }
@@ -181,7 +175,6 @@ const Domains = () => {
           'Content-Type': 'application/json'
         };
         
-        // Get existing sub-domains for this domain
         const existingRes = await fetch(`${API_BASE_URL}/weightage-management/domain-sub-domains/${domainId}`, {
           headers
         });
@@ -191,21 +184,17 @@ const Domains = () => {
           subDomainName: dsd.sub_domain_name || dsd.subDomainName
         }));
         
-        // Add new sub-domains
         for (const subDomain of formData.sub_domains) {
           const exists = existingSubDomains.find(esd => esd.subDomainId === subDomain.subDomainId);
           if (!exists) {
-            console.log('Adding sub-domain to domain:', { domainId, subDomainId: subDomain.subDomainId, weightage: subDomain.weightage });
-            const response = await fetch(`${API_BASE_URL}/weightage-management/domain-sub-domains/${domainId}/${subDomain.subDomainId}`, {
+            await fetch(`${API_BASE_URL}/weightage-management/domain-sub-domains/${domainId}/${subDomain.subDomainId}`, {
               method: 'POST',
               headers,
               body: JSON.stringify({ weightage: parseFloat(subDomain.weightage) || 0 })
             });
-            console.log('Add sub-domain response:', response.status, await response.clone().text());
           }
         }
         
-        // Remove sub-domains that are no longer in the list
         for (const existing of existingSubDomains) {
           const stillExists = formData.sub_domains.find(sd => sd.subDomainId === existing.subDomainId);
           if (!stillExists) {
@@ -238,6 +227,39 @@ const Domains = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Pagination component
+  const Pagination = ({ currentPage, totalPages, onPageChange }) => {
+    if (totalPages <= 1) return null;
+    const pages = [];
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(totalPages, currentPage + 2);
+    for (let i = start; i <= end; i++) pages.push(i);
+    
+    return (
+      <div className="pagination">
+        <button className="pagination-btn" onClick={() => onPageChange(1)} disabled={currentPage === 1} title="First">
+          &laquo;
+        </button>
+        <button className="pagination-btn" onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1}>
+          &lsaquo;
+        </button>
+        {start > 1 && <span className="pagination-ellipsis">...</span>}
+        {pages.map(p => (
+          <button key={p} className={`pagination-btn ${p === currentPage ? 'active' : ''}`} onClick={() => onPageChange(p)}>
+            {p}
+          </button>
+        ))}
+        {end < totalPages && <span className="pagination-ellipsis">...</span>}
+        <button className="pagination-btn" onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages}>
+          &rsaquo;
+        </button>
+        <button className="pagination-btn" onClick={() => onPageChange(totalPages)} disabled={currentPage === totalPages} title="Last">
+          &raquo;
+        </button>
+      </div>
+    );
   };
 
   return (
@@ -281,51 +303,54 @@ const Domains = () => {
           )}
         </div>
       ) : (
-        <div className="stages-list">
-          <table className="stages-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Description</th>
-                <th>Sub-Domains</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredDomains.map((domain) => (
-                <tr key={domain.id} className={domain.isActive === false ? 'inactive' : ''}>
-                  <td className="table-name">{domain.name}</td>
-                  <td className="table-description">{domain.description || '-'}</td>
-                  <td className="table-count">{domain.sub_domains?.length || 0}</td>
-                  <td className="table-status">
-                    <span className={`status-badge ${domain.isActive === false ? 'inactive' : 'active'}`}>
-                      {domain.isActive === false ? 'Inactive' : 'Active'}
-                    </span>
-                  </td>
-                  <td className="table-actions">
-                    {!isManager && (
-                      <>
-                        <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(domain)}>
-                          Edit
-                        </button>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(domain.id)}>
-                          Delete
-                        </button>
-                      </>
-                    )}
-                    {isManager && <span style={{ color: '#6b7280', fontSize: '13px' }}>Read-only</span>}
-                  </td>
+        <>
+          <div className="stages-list">
+            <table className="stages-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Description</th>
+                  <th>Sub-Domains</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {paginatedDomains.map((domain) => (
+                  <tr key={domain.id} className={domain.isActive === false ? 'inactive' : ''}>
+                    <td className="table-name">{domain.name}</td>
+                    <td className="table-description">{domain.description || '-'}</td>
+                    <td className="table-count">{domain.sub_domains?.length || 0}</td>
+                    <td className="table-status">
+                      <span className={`status-badge ${domain.isActive === false ? 'inactive' : 'active'}`}>
+                        {domain.isActive === false ? 'Inactive' : 'Active'}
+                      </span>
+                    </td>
+                    <td className="table-actions">
+                      {!isManager && (
+                        <>
+                          <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(domain)}>
+                            Edit
+                          </button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(domain.id)}>
+                            Delete
+                          </button>
+                        </>
+                      )}
+                      {isManager && <span style={{ color: '#6b7280', fontSize: '13px' }}>Read-only</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
+        </>
       )}
 
       {showForm && (
         <div className="modal-overlay" style={{ pointerEvents: 'none' }} onClick={() => setShowForm(false)}>
-          <div className="modal-content" style={{ pointerEvents: 'auto', maxWidth: '800px' }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" style={{ pointerEvents: 'auto', maxWidth: '700px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">{editingId ? 'Edit Domain' : 'Create Domain'}</h2>
               <button className="modal-close" onClick={() => setShowForm(false)}>
@@ -353,23 +378,6 @@ const Domains = () => {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Weightage (%)</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  className="form-input"
-                  value={formData.weightage}
-                  onChange={(e) => setFormData({ ...formData, weightage: parseFloat(e.target.value) || 0 })}
-                  placeholder="Enter weightage percentage (0-100)"
-                />
-                <span className="form-hint">
-                  Weightage percentage for this domain (0-100). Total of all domains should equal 100%.
-                </span>
               </div>
 
               <div className="form-checkbox-group">
@@ -416,17 +424,10 @@ const Domains = () => {
                           return (s.name || '').toLowerCase().includes(q);
                         })
                         .map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
+                        <option key={s.id} value={s.id}>{s.name}</option>
                       ))}
                     </select>
-                    <button
-                      type="button"
-                      className="subdomain-add-btn"
-                      onClick={handleAddSubDomain}
-                      disabled={!selectedSectionId}
-                    >
+                    <button type="button" className="subdomain-add-btn" onClick={handleAddSubDomain} disabled={!selectedSectionId}>
                       + Add
                     </button>
                   </div>
@@ -435,48 +436,33 @@ const Domains = () => {
                     <>
                       <div className="subdomain-list">
                         {formData.sub_domains.map((subDomain, idx) => (
-                          <div
-                            key={`${subDomain.subDomainId}-${idx}`}
-                            className="subdomain-item"
-                          >
+                          <div key={`${subDomain.subDomainId}-${idx}`} className="subdomain-item">
                             <div className="subdomain-item-info">
-                              <span className="subdomain-item-name">
-                                {subDomain.subDomainName}
-                              </span>
+                              <span className="subdomain-item-name">{subDomain.subDomainName}</span>
                               <div className="subdomain-item-weightage">
                                 <input
                                   type="number"
                                   className="subdomain-weight-input"
-                                  min="0"
-                                  max="100"
-                                  step="0.01"
+                                  min="0" max="100" step="0.01"
                                   value={subDomain.weightage || 0}
                                   onChange={(e) => {
-                                    const updatedSubDomains = [...formData.sub_domains];
-                                    updatedSubDomains[idx] = {
-                                      ...updatedSubDomains[idx],
-                                      weightage: parseFloat(e.target.value) || 0
-                                    };
-                                    setFormData({ ...formData, sub_domains: updatedSubDomains });
+                                    const updated = [...formData.sub_domains];
+                                    updated[idx] = { ...updated[idx], weightage: parseFloat(e.target.value) || 0 };
+                                    setFormData({ ...formData, sub_domains: updated });
                                   }}
                                 />
                                 <span className="subdomain-weight-label">%</span>
                               </div>
                             </div>
-                            <button
-                              type="button"
-                              className="subdomain-remove-btn"
-                              onClick={() => handleRemoveSubDomain(idx)}
-                              title="Remove sub-domain"
-                            >
+                            <button type="button" className="subdomain-remove-btn" onClick={() => handleRemoveSubDomain(idx)} title="Remove">
                               ✕
                             </button>
                           </div>
                         ))}
                       </div>
                       <div className="subdomain-total">
-                        <span>Total Weightage</span>
-                        <span>{Number(formData.sub_domains.reduce((sum, subDomain) => sum + (subDomain.weightage || 0), 0)).toFixed(2)}%</span>
+                        <span>Total Sub-Domain Weightage</span>
+                        <span>{Number(formData.sub_domains.reduce((sum, s) => sum + (s.weightage || 0), 0)).toFixed(2)}%</span>
                       </div>
                     </>
                   ) : (
@@ -489,9 +475,7 @@ const Domains = () => {
             </div>
 
             <div className="modal-actions">
-              <button className="btn btn-secondary" type="button" onClick={() => setShowForm(false)}>
-                Cancel
-              </button>
+              <button className="btn btn-secondary" type="button" onClick={() => setShowForm(false)}>Cancel</button>
               <button className="btn btn-primary" type="button" onClick={handleSave}>
                 {editingId ? 'Update Domain' : 'Create Domain'}
               </button>

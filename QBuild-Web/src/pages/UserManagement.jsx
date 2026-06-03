@@ -1,6 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { userApi } from '../services/api';
 import '../styles/UserManagement.css';
+
+const PAGE_SIZE = 10;
+
+const Pagination = ({ currentPage, totalPages, onPageChange }) => {
+  if (totalPages <= 1) return null;
+  const pages = [];
+  const start = Math.max(1, currentPage - 2);
+  const end = Math.min(totalPages, currentPage + 2);
+  for (let i = start; i <= end; i++) pages.push(i);
+  return (
+    <div className="pagination" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px', padding: '24px 16px', borderTop: '1px solid #e5e7eb' }}>
+      <button className="pagination-btn" onClick={() => onPageChange(1)} disabled={currentPage === 1} style={{ minWidth: '36px', height: '36px', border: '1px solid #e5e7eb', borderRadius: '6px', background: '#fff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>&laquo;</button>
+      <button className="pagination-btn" onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} style={{ minWidth: '36px', height: '36px', border: '1px solid #e5e7eb', borderRadius: '6px', background: '#fff', cursor: 'pointer' }}>&lsaquo;</button>
+      {start > 1 && <span style={{ padding: '0 4px', color: '#9ca3af' }}>...</span>}
+      {pages.map(p => (
+        <button key={p} onClick={() => onPageChange(p)} style={{ minWidth: '36px', height: '36px', border: '1px solid #e5e7eb', borderRadius: '6px', background: p === currentPage ? '#2563eb' : '#fff', color: p === currentPage ? '#fff' : '#374151', fontWeight: p === currentPage ? 600 : 500, cursor: 'pointer' }}>{p}</button>
+      ))}
+      {end < totalPages && <span style={{ padding: '0 4px', color: '#9ca3af' }}>...</span>}
+      <button className="pagination-btn" onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} style={{ minWidth: '36px', height: '36px', border: '1px solid #e5e7eb', borderRadius: '6px', background: '#fff', cursor: 'pointer' }}>&rsaquo;</button>
+      <button className="pagination-btn" onClick={() => onPageChange(totalPages)} disabled={currentPage === totalPages} style={{ minWidth: '36px', height: '36px', border: '1px solid #e5e7eb', borderRadius: '6px', background: '#fff', cursor: 'pointer' }}>&raquo;</button>
+    </div>
+  );
+};
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -27,6 +50,7 @@ const UserManagement = () => {
     permanentAddress: ''
   });
   const [editingId, setEditingId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     loadUsers();
@@ -45,14 +69,23 @@ const UserManagement = () => {
     }
   };
 
-  const filteredUsers = users.filter(user => {
+  const filteredUsers = useMemo(() => {
     const q = searchTerm.toLowerCase();
-    const matchesSearch = (user.name || '').toLowerCase().includes(q) ||
-                         (user.email || '').toLowerCase().includes(q) ||
-                         (user.department || '').toLowerCase().includes(q);
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    return matchesSearch && matchesRole;
-  });
+    return users.filter(user => {
+      const matchesSearch = (user.name || '').toLowerCase().includes(q) ||
+                           (user.email || '').toLowerCase().includes(q) ||
+                           (user.department || '').toLowerCase().includes(q);
+      const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+      return matchesSearch && matchesRole;
+    });
+  }, [users, searchTerm, roleFilter]);
+
+  // Reset page on filter change
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, roleFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const paginatedUsers = filteredUsers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const handlePageChange = (page) => setCurrentPage(Math.max(1, Math.min(page, totalPages)));
 
   const getRoleBadgeClass = (role) => {
     switch (role) {
@@ -336,7 +369,7 @@ const UserManagement = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredUsers.map(user => (
+            {paginatedUsers.map(user => (
               <tr key={user.id} className={!user.isActive ? 'inactive' : ''}>
                 <td>
                   <div className="user-cell">
@@ -394,6 +427,8 @@ const UserManagement = () => {
           </div>
         )}
       </div>
+
+      <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
 
       {/* Modal Form */}
       {showForm && (
