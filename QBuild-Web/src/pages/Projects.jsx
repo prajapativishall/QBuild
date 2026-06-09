@@ -292,6 +292,27 @@ const Projects = () => {
                   </div>
                 </div>
               </div>
+              <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '16px', marginTop: '16px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '12px' }}>Alternate Client Contact</h3>
+                <div className="form-row" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
+                    <label className="form-label">Name</label>
+                    <input type="text" className="form-input" placeholder="Name" value={formData.alternateClientName} onChange={(e) => setFormData({...formData, alternateClientName: e.target.value})} />
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
+                    <label className="form-label">Designation</label>
+                    <input type="text" className="form-input" placeholder="Designation" value={formData.alternateDesignation} onChange={(e) => setFormData({...formData, alternateDesignation: e.target.value})} />
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
+                    <label className="form-label">Mobile</label>
+                    <input type="text" className="form-input" placeholder="Mobile" value={formData.alternateMobileNo} onChange={(e) => setFormData({...formData, alternateMobileNo: e.target.value})} />
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
+                    <label className="form-label">Email</label>
+                    <input type="email" className="form-input" placeholder="Email" value={formData.alternateEmail} onChange={(e) => setFormData({...formData, alternateEmail: e.target.value})} />
+                  </div>
+                </div>
+              </div>
               <div className="modal-actions" style={{ marginTop: '20px', borderTop: '1px solid #e0e0e0', paddingTop: '16px' }}>
                 <button className="btn btn-secondary" onClick={() => { setShowForm(false); setEditingId(null); }}>Close</button>
                 <button className="btn btn-primary" onClick={handleSave}>Save</button>
