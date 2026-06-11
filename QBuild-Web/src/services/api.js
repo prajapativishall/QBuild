@@ -28,29 +28,18 @@ const apiCall = async (endpoint, options = {}) => {
     cache: 'no-store',
   };
 
-  try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-    const data = await response.json();
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+  const data = await response.json();
 
-    if (!response.ok) {
-      // Handle auth errors
-      if (response.status === 401 || data?.code === 'UnauthorizedError') {
-        console.error('Authentication required. Please log in.');
-        // Optionally redirect to login
-        // window.location.href = '/login';
-      }
-      // Use the most descriptive error available: data.error (string) > data.message > data.error?.message
-      const errorMsg = typeof data?.error === 'string' 
-        ? data.error 
-        : (data?.message || data?.error?.message || `API Error: ${response.status}`);
-      throw new Error(errorMsg);
-    }
-
-    return data;
-  } catch (error) {
-    console.error('API Error:', error);
-    throw error;
+  if (!response.ok) {
+    // Use the most descriptive error available: data.error (string) > data.message > data.error?.message
+    const errorMsg = typeof data?.error === 'string'
+      ? data.error
+      : (data?.message || data?.error?.message || `API Error: ${response.status}`);
+    throw new Error(errorMsg);
   }
+
+  return data;
 };
 
 // Create axios instance with default config

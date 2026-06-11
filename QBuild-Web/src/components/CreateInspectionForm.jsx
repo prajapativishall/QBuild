@@ -54,17 +54,17 @@ const validateWeightages = (stages) => {
   }
 
   // Check domain weightages total = 100%
-  const domainTotal = round2(stages.reduce((sum, s) => sum + (s.weightage || 0), 0));
+  const domainTotal = stages.reduce((sum, s) => sum + parseFloat(s.weightage || 0), 0);
   if (Math.abs(domainTotal - 100) > 0.01) {
-    warnings.push(`Domain weightages total ${domainTotal}% — must equal 100%.`);
+    warnings.push(`Domain weightages total ${domainTotal.toFixed(2)}% — must equal 100%.`);
   }
 
   // Check sub-domain weightages within each domain
   stages.forEach((stage) => {
     if (!stage.sections || stage.sections.length === 0) return;
-    const sdTotal = round2(stage.sections.reduce((sum, sec) => sum + (sec.weightage || 0), 0));
+    const sdTotal = stage.sections.reduce((sum, sec) => sum + parseFloat(sec.weightage || 0), 0);
     if (Math.abs(sdTotal - 100) > 0.01) {
-      warnings.push(`"${stage.stageName}" sub-domain weightages total ${sdTotal}% — must equal 100%.`);
+      warnings.push(`"${stage.stageName}" sub-domain weightages total ${sdTotal.toFixed(2)}% — must equal 100%.`);
     }
   });
 
@@ -75,9 +75,6 @@ const CreateInspectionForm = ({ project, sourcePhaseNumber, phaseNumber, mode = 
   const isEditMode = mode === 'edit' && phaseNumber;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [weightageWarnings, setWeightageWarnings] = useState([]);
-  const [showWeightageWarning, setShowWeightageWarning] = useState(false);
-  const [pendingSubmit, setPendingSubmit] = useState(false);
   const [users, setUsers] = useState([]);
   const [availableStages, setAvailableStages] = useState([]);
   const [selectedStageId, setSelectedStageId] = useState('');
@@ -164,26 +161,30 @@ const CreateInspectionForm = ({ project, sourcePhaseNumber, phaseNumber, mode = 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate weightages before submission
-    const warnings = validateWeightages(formData.stages);
+    // Validate weightages - BLOCK submission if warnings exist
+    const warnings = computeWeightageWarnings();
     if (warnings.length > 0) {
-      setWeightageWarnings(warnings);
-      setShowWeightageWarning(true);
-      setPendingSubmit(true);
-      return; // Don't submit until user confirms via warning modal
+      toast.error('Please fix all weightage issues before creating the inspection.');
+      return;
     }
 
     await doSubmit();
   };
 
+  // Compute weightage warnings reactively from current stages data
+  const computeWeightageWarnings = () => validateWeightages(formData.stages);
+  
+  const currentWeightageWarnings = computeWeightageWarnings();
+
   const doSubmit = async () => {
     try {
       setSaving(true);
-      setShowWeightageWarning(false);
 
       const mappedDomains = (formData.stages || []).map(stage => ({
         domainId: stage.stageId,
         weightage: stage.weightage,
+        domainName: stage.stageName,
+        stageName: stage.stageName,
         subDomains: (stage.sections || []).map(section => ({
           subDomainId: section.sectionId,
           weightage: section.weightage,
@@ -221,16 +222,10 @@ const CreateInspectionForm = ({ project, sourcePhaseNumber, phaseNumber, mode = 
 
       onSuccess && onSuccess();
     } catch (error) {
-      console.error('Error saving phase:', error);
       toast.error(error.message || (isEditMode ? 'Failed to update phase' : 'Failed to create new phase'));
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleConfirmProceedWithWarnings = () => {
-    setPendingSubmit(false);
-    doSubmit();
   };
 
   const handleAddStage = async () => {
@@ -525,6 +520,37 @@ const CreateInspectionForm = ({ project, sourcePhaseNumber, phaseNumber, mode = 
           </div>
         </div>
 
+        {/* Inline weightage warning banner - blocks submission until fixed */}
+        {currentWeightageWarnings.length > 0 && formData.stages.length > 0 && (
+          <div style={{
+            marginBottom: '16px',
+            padding: '12px 16px',
+            background: '#fef2f2',
+            border: '1px solid #fca5a5',
+            borderRadius: '8px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+              <span style={{ fontSize: '16px', flexShrink: 0 }}>⚠️</span>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: '0 0 8px 0', fontWeight: 600, color: '#b91c1c', fontSize: '14px' }}>
+                  Cannot Create Inspection — Weightages Must Equal 100%
+                </p>
+                <div style={{ marginBottom: '8px' }}>
+                  {currentWeightageWarnings.map((warning, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', padding: '2px 0', color: '#991b1b', fontSize: '13px' }}>
+                      <span style={{ flexShrink: 0 }}>•</span>
+                      <span>{warning}</span>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ margin: 0, color: '#b91c1c', fontSize: '12px', opacity: 0.8 }}>
+                  Adjust the weightage values above so all totals equal 100% before submitting.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {formData.stages.length === 0 ? (
           <p style={{ color: '#9ca3af', fontStyle: 'italic', padding: '20px', textAlign: 'center', background: '#f9fafb', borderRadius: '8px' }}>
             No domains configured. Add domains above or load from a previous phase.
@@ -627,65 +653,6 @@ const CreateInspectionForm = ({ project, sourcePhaseNumber, phaseNumber, mode = 
         onSave={handleSaveQueriesForSection}
       />
 
-      {/* Weightage Warning Modal */}
-      {showWeightageWarning && (
-        <div className="modal-overlay" style={{ pointerEvents: 'none', zIndex: 1100 }}>
-          <div className="modal-content" style={{ pointerEvents: 'auto', maxWidth: '550px' }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="modal-title" style={{ color: '#f59e0b' }}>
-                ⚠️ Weightage Rule Violation
-              </h2>
-              <button className="modal-close" onClick={() => setShowWeightageWarning(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              <p style={{ color: '#6b7280', marginBottom: '16px', lineHeight: '1.5' }}>
-                The following weightage rules are broken. Domain weightages and sub-domain weightages within each domain should sum to 100%.
-              </p>
-              <div style={{
-                background: '#fffbeb',
-                border: '1px solid #fde68a',
-                borderRadius: '8px',
-                padding: '12px 16px',
-                marginBottom: '16px'
-              }}>
-                {weightageWarnings.map((warning, idx) => (
-                  <div key={idx} style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '8px',
-                    padding: '4px 0',
-                    color: '#92400e',
-                    fontSize: '14px'
-                  }}>
-                    <span style={{ flexShrink: 0 }}>•</span>
-                    <span>{warning}</span>
-                  </div>
-                ))}
-              </div>
-              <p style={{ color: '#6b7280', fontSize: '13px', lineHeight: '1.5' }}>
-                You can fix the weightages now, or proceed anyway. Proceeding with incorrect weightages may result in inaccurate score calculations.
-              </p>
-            </div>
-            <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setShowWeightageWarning(false)}
-              >
-                Fix Weightages
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ background: '#f59e0b', borderColor: '#f59e0b' }}
-                onClick={handleConfirmProceedWithWarnings}
-              >
-                Proceed Anyway
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </form>
   );
 };

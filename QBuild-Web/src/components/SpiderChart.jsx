@@ -38,6 +38,12 @@ const SpiderChart = ({ data, title, height = 400, maxRating = 10, onDomainClick,
     return '#ef4444'; // red (0 to 6)
   };
 
+  // Estimate text width based on character count (rough approximation)
+  const getTextWidth = (text, fontSize = 11) => {
+    const charWidth = fontSize * 0.6; // Approximate width per character
+    return text.length * charWidth + 20; // Add padding
+  };
+
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       const value = payload[0].value;
@@ -56,7 +62,7 @@ const SpiderChart = ({ data, title, height = 400, maxRating = 10, onDomainClick,
     return null;
   };
 
-  // Custom angle axis with clickable labels
+  // Custom angle axis with clickable labels and dynamic background
   const CustomAngleAxis = ({ payload, x, y, ...props }) => {
     const handleClick = () => {
       if (onDomainClick && !payload.value.includes(':')) {
@@ -67,6 +73,10 @@ const SpiderChart = ({ data, title, height = 400, maxRating = 10, onDomainClick,
     // Check if this is the rating axis (first item when rating is provided)
     const isRatingAxis = payload.value.includes(':') && rating !== null;
     const ratingColor = isRatingAxis ? getRatingColor(rating) : '#374151';
+    
+    // Dynamic width based on text length
+    const textWidth = getTextWidth(payload.value);
+    const rectWidth = Math.max(textWidth, 80); // Minimum width of 80
 
     return (
       <g>
@@ -74,18 +84,18 @@ const SpiderChart = ({ data, title, height = 400, maxRating = 10, onDomainClick,
           // Rating axis - prominent styling with background
           <g>
             <rect
-              x={x - 50}
+              x={x - rectWidth / 2}
               y={y - 20}
-              width={100}
+              width={rectWidth}
               height={24}
               rx={12}
               fill={ratingColor}
               opacity={0.15}
             />
             <rect
-              x={x - 46}
+              x={x - (rectWidth - 8) / 2}
               y={y - 16}
-              width={92}
+              width={rectWidth - 8}
               height={16}
               rx={8}
               fill={ratingColor}
@@ -103,18 +113,32 @@ const SpiderChart = ({ data, title, height = 400, maxRating = 10, onDomainClick,
             </text>
           </g>
         ) : (
-          // Regular domain/subdomain label
-          <text
-            {...props}
-            x={x}
-            y={y}
-            onClick={handleClick}
-            style={{ cursor: onDomainClick ? 'pointer' : 'default', fontWeight: 500 }}
-            fill="#374151"
-            fontSize={11}
-          >
-            {payload.value}
-          </text>
+          // Regular domain/subdomain label with dynamic background
+          <g>
+            <rect
+              x={x - rectWidth / 2}
+              y={y - 12}
+              width={rectWidth}
+              height={20}
+              rx={10}
+              fill="#f3f4f6"
+              opacity={0.8}
+              onClick={handleClick}
+              style={{ cursor: onDomainClick ? 'pointer' : 'default' }}
+            />
+            <text
+              {...props}
+              x={x}
+              y={y + 4}
+              onClick={handleClick}
+              style={{ cursor: onDomainClick ? 'pointer' : 'default', fontWeight: 500 }}
+              fill="#374151"
+              fontSize={11}
+              textAnchor="middle"
+            >
+              {payload.value}
+            </text>
+          </g>
         )}
       </g>
     );

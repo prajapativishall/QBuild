@@ -988,20 +988,42 @@ class DatabaseConnection {
       await ensureColumn('sub_domain_scores', 'domain_id', 'ALTER TABLE sub_domain_scores ADD COLUMN domain_id INT NULL AFTER sub_domain_id');
       
       // Migrate unique key to include domain_id
+      // The old key was named 'unique_inspection_subdomain' (without domain_id),
+      // which caused same sub_domain across different domains to overwrite each other's scores
+      const oldKeyNames = ['uq_inspection_sub_domain', 'unique_inspection_subdomain'];
+      for (const oldKeyName of oldKeyNames) {
+        try {
+          const oldKeyExists = await this.executeOne(`
+            SELECT 1 as ok FROM information_schema.table_constraints
+            WHERE table_schema = DATABASE()
+              AND table_name = 'sub_domain_scores'
+              AND constraint_name = ?
+              AND constraint_type = 'UNIQUE'
+          `, [oldKeyName]);
+          if (oldKeyExists) {
+            await this.execute(`ALTER TABLE sub_domain_scores DROP INDEX \`${oldKeyName}\``);
+            logger.info(`Migrated sub_domain_scores: dropped old unique key '${oldKeyName}'`);
+          }
+        } catch (e) {
+          logger.debug(`sub_domain_scores unique key migration for '${oldKeyName}':`, e.message);
+        }
+      }
+      
+      // Add new composite unique key if it doesn't exist
       try {
-        const oldKeyExists = await this.executeOne(`
+        const newKeyExists = await this.executeOne(`
           SELECT 1 as ok FROM information_schema.table_constraints
           WHERE table_schema = DATABASE()
             AND table_name = 'sub_domain_scores'
-            AND constraint_name = 'uq_inspection_sub_domain'
+            AND constraint_name = 'uq_inspection_sub_domain_domain'
             AND constraint_type = 'UNIQUE'
         `);
-        if (oldKeyExists) {
-          await this.execute('ALTER TABLE sub_domain_scores DROP INDEX uq_inspection_sub_domain');
-          logger.info('Migrated sub_domain_scores unique key');
+        if (!newKeyExists) {
+          await this.execute('ALTER TABLE sub_domain_scores ADD UNIQUE KEY uq_inspection_sub_domain_domain (inspection_id, sub_domain_id, domain_id)');
+          logger.info('Migrated sub_domain_scores: added composite unique key with domain_id');
         }
       } catch (e) {
-        logger.debug('sub_domain_scores unique key migration:', e.message);
+        logger.debug('sub_domain_scores add new unique key:', e.message);
       }
     } else {
       // Create sub_domain_scores table if it doesn't exist
