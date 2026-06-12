@@ -115,6 +115,14 @@ const reviewWorkflow = {
            WHERE id = ?`,
           [userId, notes || null, inspectionId]
         );
+
+        // Also update phase status to 'approved' so it doesn't stay 'submitted'
+        await connection.execute(
+          `UPDATE phases
+           SET status = 'approved', updated_at = NOW()
+           WHERE project_id = ? AND phase_number = ?`,
+          [inspectionProjectId, inspectionPhase]
+        );
       } else {
         // Reviewer approval flow: update approval_status
         await connection.execute(

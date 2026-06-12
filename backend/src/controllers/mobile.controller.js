@@ -944,11 +944,13 @@ const submitFinalInspection = async (req, res, next) => {
         [inspectionId]
       );
 
+      // Only set phase to 'submitted' if it's not already 'approved' or 'rejected'
+      // Prevents overwriting a fully approved inspection's phase status
       await db.execute(
         `UPDATE phases ph
          INNER JOIN inspections i ON ph.project_id = i.project_id AND ph.phase_number = i.phase
          SET ph.status = 'submitted', ph.updated_at = NOW()
-         WHERE i.id = ?`,
+         WHERE i.id = ? AND ph.status NOT IN ('approved', 'rejected')`,
         [inspectionId]
       );
     }
