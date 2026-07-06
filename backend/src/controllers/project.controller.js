@@ -161,13 +161,29 @@ class ProjectController {
       // Determine the target phase number
       let targetPhaseNumber = phase;
       if (!targetPhaseNumber) {
-        const currentPhaseRows = await db.execute(
-          `SELECT ph.phase_number FROM projects p
-           LEFT JOIN phases ph ON p.current_phase_id = ph.id
-           WHERE p.id = ?`,
+        // FIX: Instead of using current_phase_id (which always points to the latest phase),
+        // find the latest phase that has a manager-approved inspection.
+        // This ensures the spider chart shows data for the most recently approved phase.
+        const approvedPhaseRows = await db.execute(
+          `SELECT i.phase FROM inspections i
+           WHERE i.project_id = ? AND i.manager_approval_status = 'approved'
+           ORDER BY i.phase DESC
+           LIMIT 1`,
           [projectId]
         );
-        targetPhaseNumber = currentPhaseRows[0]?.phase_number;
+        
+        if (approvedPhaseRows.length > 0) {
+          targetPhaseNumber = approvedPhaseRows[0].phase;
+        } else {
+          // Fall back to current_phase_id if no approved inspection exists
+          const currentPhaseRows = await db.execute(
+            `SELECT ph.phase_number FROM projects p
+             LEFT JOIN phases ph ON p.current_phase_id = ph.id
+             WHERE p.id = ?`,
+            [projectId]
+          );
+          targetPhaseNumber = currentPhaseRows[0]?.phase_number;
+        }
       }
 
       if (!targetPhaseNumber) {
@@ -245,13 +261,26 @@ class ProjectController {
       // Determine the target phase number
       let targetPhaseNumber = phase;
       if (!targetPhaseNumber) {
-        const currentPhaseRows = await db.execute(
-          `SELECT ph.phase_number FROM projects p
-           LEFT JOIN phases ph ON p.current_phase_id = ph.id
-           WHERE p.id = ?`,
+        // FIX: Same fix as getProjectSpiderChart - find latest approved phase
+        const approvedPhaseRows = await db.execute(
+          `SELECT i.phase FROM inspections i
+           WHERE i.project_id = ? AND i.manager_approval_status = 'approved'
+           ORDER BY i.phase DESC
+           LIMIT 1`,
           [projectId]
         );
-        targetPhaseNumber = currentPhaseRows[0]?.phase_number;
+        
+        if (approvedPhaseRows.length > 0) {
+          targetPhaseNumber = approvedPhaseRows[0].phase;
+        } else {
+          const currentPhaseRows = await db.execute(
+            `SELECT ph.phase_number FROM projects p
+             LEFT JOIN phases ph ON p.current_phase_id = ph.id
+             WHERE p.id = ?`,
+            [projectId]
+          );
+          targetPhaseNumber = currentPhaseRows[0]?.phase_number;
+        }
       }
 
       if (!targetPhaseNumber) {

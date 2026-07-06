@@ -188,7 +188,7 @@ const Layout = () => {
               </ul>
             </div>
           ) : (
-            // Admin - show all navigation
+            // Admin - show all navigation including inspection management
             <>
               <div className="sidebar-nav-section">
                 <h3 className="sidebar-nav-title">Main</h3>
@@ -227,6 +227,24 @@ const Layout = () => {
                       }}
                     >
                       <span className="sidebar-nav-text">Reports</span>
+                    </a>
+                  </li>
+                </ul>
+              </div>
+              
+              <div className="sidebar-nav-section">
+                <h3 className="sidebar-nav-title">Inspections</h3>
+                <ul className="sidebar-nav-list">
+                  <li className="sidebar-nav-item">
+                    <a
+                      href="/manager-dashboard"
+                      className={`sidebar-nav-link ${isActiveRoute('/manager-dashboard') ? 'active' : ''}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleNavigation('/manager-dashboard');
+                      }}
+                    >
+                      <span className="sidebar-nav-text">Inspection Approvals</span>
                     </a>
                   </li>
                 </ul>

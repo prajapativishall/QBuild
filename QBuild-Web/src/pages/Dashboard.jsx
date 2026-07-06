@@ -21,6 +21,7 @@ const Dashboard = () => {
   const [selectedDomain, setSelectedDomain] = useState(null);
   const [domainSpiderChartData, setDomainSpiderChartData] = useState(null);
   const [domainSpiderChartLoading, setDomainSpiderChartLoading] = useState(false);
+  const [spiderChartError, setSpiderChartError] = useState(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -69,9 +70,19 @@ const Dashboard = () => {
       if (response.success) {
         const phasesList = response.data || [];
         setPhases(phasesList);
-        // Auto-select the latest phase
+        // Auto-select the latest manager-approved phase instead of the latest phase
         if (phasesList.length > 0 && !selectedPhase) {
-          setSelectedPhase(phasesList[phasesList.length - 1].phase_number);
+          // Find the latest phase that has manager_approval_status = 'approved'
+          const approvedPhases = phasesList.filter(
+            phase => phase.manager_approval_status === 'approved'
+          );
+          if (approvedPhases.length > 0) {
+            // Select the most recent approved phase
+            setSelectedPhase(approvedPhases[approvedPhases.length - 1].phase_number);
+          } else {
+            // Fall back to latest phase if none approved
+            setSelectedPhase(phasesList[phasesList.length - 1].phase_number);
+          }
         }
       }
       setPhasesLoading(false);
@@ -84,15 +95,62 @@ const Dashboard = () => {
   const [projectRating, setProjectRating] = useState(null);
   const [domainRating, setDomainRating] = useState(null);
 
+  // Get a human-readable status message explaining what's happening with the inspection
+  const getPhaseStatusMessage = (phase) => {
+    const inspStatus = phase.inspection_status || phase.status;
+    const approvalStatus = phase.approval_status;
+    const managerApprovalStatus = phase.manager_approval_status;
+    const inspectorName = phase.inspector_name || 'Inspector';
+    const reviewerName = phase.reviewer_name || 'Reviewer';
+
+    if (!phase.inspection_id) {
+      return { message: 'Waiting for inspector assignment', type: 'pending' };
+    }
+
+    // Inspector hasn't submitted yet
+    if (inspStatus === 'pending' || inspStatus === 'in_progress' || approvalStatus === 'rejected') {
+      if (approvalStatus === 'rejected') {
+        return { message: `Rejected - ${inspectorName} needs to resubmit`, type: 'rejected' };
+      }
+      return { message: `Waiting for ${inspectorName} (Inspector) to submit`, type: 'pending' };
+    }
+
+    // Submitted to reviewer
+    if (approvalStatus === 'pending' && managerApprovalStatus === 'pending') {
+      if (reviewerName !== 'Reviewer') {
+        return { message: `Waiting for ${reviewerName} (Reviewer) to approve`, type: 'review' };
+      }
+      return { message: 'Waiting for Reviewer approval', type: 'review' };
+    }
+
+    // Reviewer approved - waiting for manager
+    if (approvalStatus === 'approved' && managerApprovalStatus === 'pending') {
+      const managerName = phase.manager_name || 'Manager';
+      return { message: `Waiting for ${managerName} (Manager) to approve`, type: 'review' };
+    }
+
+    // Manager approved
+    if (managerApprovalStatus === 'approved') {
+      return { message: 'Approved - Spider chart available', type: 'approved' };
+    }
+
+    return { message: `Status: ${inspStatus || 'Unknown'}`, type: 'pending' };
+  };
+
   const loadSpiderChartData = async (projectId, phase = null) => {
     try {
       setSpiderChartLoading(true);
+      setSpiderChartError(null);
+      setSpiderChartData(null);
       const response = await projectApi.getProjectSpiderChart(projectId, phase);
       setSpiderChartData(response.data);
       setProjectRating(response.overallRating || null);
       setSpiderChartLoading(false);
     } catch (error) {
-      console.error('Error loading spider chart data:', error);
+      // Store the error message for status display, but don't log expected "not approved" errors to console
+      setSpiderChartError(error.message);
+      setSpiderChartData(null);
+      setProjectRating(null);
       setSpiderChartLoading(false);
     }
   };
@@ -113,10 +171,25 @@ const Dashboard = () => {
     setSelectedPhase(phase);
     setSelectedDomain(null);
     setDomainSpiderChartData(null);
-    // Reload spider chart data for the selected phase
+    // Only call API if the selected phase is manager-approved (otherwise show status message instead)
     if (selectedProject) {
-      loadSpiderChartData(selectedProject, phase);
+      const selectedPhaseData = phases.find(p => p.phase_number === phase);
+      if (selectedPhaseData && selectedPhaseData.manager_approval_status === 'approved') {
+        loadSpiderChartData(selectedProject, phase);
+      } else {
+        // Clear chart data so component shows status message instead of making an API call
+        setSpiderChartData(null);
+        setProjectRating(null);
+        setSpiderChartLoading(false);
+      }
     }
+  };
+
+  // Get status message for the currently selected phase
+  const getSelectedPhaseStatusMessage = () => {
+    const phase = phases.find(p => p.phase_number === selectedPhase);
+    if (!phase) return null;
+    return getPhaseStatusMessage(phase);
   };
 
   const handleSearch = (e) => {
@@ -250,7 +323,26 @@ const Dashboard = () => {
               />
             ) : (
               <div className="chart-empty">
-                {selectedProject ? 'No data available' : 'Select a project to view QBuild chart'}
+                {selectedProject && phases.length > 0 && selectedPhase ? (
+                  (() => {
+                    const status = getSelectedPhaseStatusMessage();
+                    if (status) {
+                      const statusColors = {
+                        pending: { bg: '#fef3c7', color: '#92400e' },
+                        rejected: { bg: '#fee2e2', color: '#991b1b' },
+                        review: { bg: '#dbeafe', color: '#1d4ed8' },
+                        approved: { bg: '#dcfce7', color: '#15803d' }
+                      };
+                      const colors = statusColors[status.type] || statusColors.pending;
+                      return (
+                        <div style={{ padding: '12px', borderRadius: '6px', backgroundColor: colors.bg, color: colors.color, fontSize: '13px', fontWeight: 500 }}>
+                          {status.message}
+                        </div>
+                      );
+                    }
+                    return 'No data available';
+                  })()
+                ) : selectedProject ? 'No data available' : 'Select a project to view QBuild chart'}
               </div>
             )}
           </div>

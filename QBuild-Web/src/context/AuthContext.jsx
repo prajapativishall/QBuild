@@ -76,6 +76,7 @@ export const AuthProvider = ({ children }) => {
     isReviewer: user?.role === 'reviewer',
     isManager: user?.role === 'manager',
     isViewer: user?.role === 'viewer',
+    isAdmin: user?.role === 'admin',
   };
 
   return (

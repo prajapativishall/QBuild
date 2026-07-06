@@ -23,7 +23,7 @@ import MobileChecklistAccept from '../pages/MobileChecklistAccept';
 import MobileInspection from '../pages/MobileInspection';
 
 const AppRoutesContent = () => {
-  const { isAuthenticated, loading, isReviewer, isManager, isViewer } = useAuth();
+  const { isAuthenticated, loading, isReviewer, isManager, isViewer, isAdmin } = useAuth();
 
   if (loading) {
     return (
@@ -70,8 +70,8 @@ const AppRoutesContent = () => {
         <Route path="users" element={isViewer || isReviewer || isManager ? <Navigate to={getDefaultRoute()} replace /> : <UserManagement />} />
         <Route path="reviewer-dashboard" element={isManager || isViewer ? <Navigate to={getDefaultRoute()} replace /> : <ReviewerDashboard />} />
         <Route path="reviewer-dashboard/review/:inspectionId" element={isManager || isViewer ? <Navigate to={getDefaultRoute()} replace /> : <ReviewerInspectionReview />} />
-        <Route path="manager-dashboard" element={isManager ? <ManagerDashboard /> : <Navigate to={getDefaultRoute()} replace />} />
-        <Route path="manager-dashboard/review/:inspectionId" element={isManager ? <ManagerInspectionReview /> : <Navigate to={getDefaultRoute()} replace />} />
+        <Route path="manager-dashboard" element={isManager || isAdmin ? <ManagerDashboard /> : <Navigate to={getDefaultRoute()} replace />} />
+        <Route path="manager-dashboard/review/:inspectionId" element={isManager || isAdmin ? <ManagerInspectionReview /> : <Navigate to={getDefaultRoute()} replace />} />
       </Route>
 
       {/* Mobile Routes (no Layout wrapper) */}
